@@ -20,36 +20,42 @@ export default function Login() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "80px auto", fontFamily: "system-ui" }}>
-      <h2>Connexion</h2>
+    <div className="login-wrap">
+      <div className="login-card">
+        <h2>Connexion</h2>
 
-      <label>Email</label>
-      <input
-        style={{ width: "100%", padding: 10, margin: "6px 0 12px" }}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="email@exemple.com"
-      />
+        <label htmlFor="email">Email</label>
+        <input
+          id="email"
+          className="input-field"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="email@exemple.com"
+          autoComplete="email"
+        />
 
-      <label>Mot de passe</label>
-      <input
-        style={{ width: "100%", padding: 10, margin: "6px 0 16px" }}
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="********"
-      />
+        <label htmlFor="password">Mot de passe</label>
+        <input
+          id="password"
+          className="input-field"
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder="********"
+          autoComplete="current-password"
+        />
 
-      <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={signIn} style={{ padding: "10px 14px" }}>
-          Se connecter
-        </button>
-        <button onClick={signUp} style={{ padding: "10px 14px" }}>
-          Créer un compte
-        </button>
+        <div className="button-row">
+          <button type="button" className="btn btn-primary" onClick={() => void signIn()}>
+            Se connecter
+          </button>
+          <button type="button" className="btn" onClick={() => void signUp()}>
+            Créer un compte
+          </button>
+        </div>
+
+        {msg && <p className="message">{msg}</p>}
       </div>
-
-      {msg && <p style={{ marginTop: 16 }}>{msg}</p>}
     </div>
   );
 }
