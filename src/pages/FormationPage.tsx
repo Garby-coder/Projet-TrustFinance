@@ -70,6 +70,42 @@ function getLessonTypeLabel(contentType: string | null) {
   return contentType?.toLowerCase() === "video" ? "Vidéo" : "Lecture";
 }
 
+function hashStringToInt(value: string) {
+  let hash = 2166136261;
+
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
+function mulberry32(seed: number) {
+  let currentSeed = seed >>> 0;
+
+  return function random() {
+    currentSeed += 0x6d2b79f5;
+    let t = currentSeed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleWithRng<T>(array: T[], rng: () => number) {
+  const values = [...array];
+
+  for (let index = values.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng() * (index + 1));
+    const temp = values[index];
+    values[index] = values[swapIndex];
+    values[swapIndex] = temp;
+  }
+
+  return values;
+}
+
 export default function FormationPage() {
   const [mode, setMode] = useState<"modules" | "fallback">("modules");
   const [modules, setModules] = useState<ModuleItem[]>([]);
@@ -85,6 +121,7 @@ export default function FormationPage() {
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizError, setQuizError] = useState("");
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [shuffledChoicesByQuestionId, setShuffledChoicesByQuestionId] = useState<Record<string, QuizChoiceRow[]>>({});
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [passed, setPassed] = useState<boolean | null>(null);
   const [quizUnavailable, setQuizUnavailable] = useState(false);
@@ -176,6 +213,7 @@ export default function FormationPage() {
       setQuizError("");
       setQuizUnavailable(false);
       setQuizQuestions([]);
+      setShuffledChoicesByQuestionId({});
       setSelectedAnswers({});
       setPassed(null);
       setQuizSubmitMessage("");
@@ -286,25 +324,28 @@ export default function FormationPage() {
           choices: (choicesByQuestion.get(question.id) ?? []).sort((a, b) => a.order_index - b.order_index),
         }));
 
-      setQuizQuestions(structuredQuestions);
-
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (!isMounted) {
         return;
       }
 
-      if (userError) {
-        setQuizError("Impossible de récupérer l'utilisateur.");
-        setLoadedQuizModuleId(activeModule.id);
-        setQuizLoading(false);
-        return;
+      const userId = userError ? null : (userData.user?.id ?? null);
+      const shuffledMap: Record<string, QuizChoiceRow[]> = {};
+      for (const question of structuredQuestions) {
+        const seedString = userId ? `${userId}:${activeModule.id}:${question.id}` : `${activeModule.id}:${question.id}`;
+        const seed = hashStringToInt(seedString);
+        const rng = mulberry32(seed);
+        shuffledMap[question.id] = shuffleWithRng(question.choices, rng);
       }
 
-      if (userData.user?.id) {
+      setQuizQuestions(structuredQuestions);
+      setShuffledChoicesByQuestionId(shuffledMap);
+
+      if (userId) {
         const { data: progressRows, error: progressError } = await supabase
           .from("module_quiz_progress")
           .select("passed")
-          .eq("user_id", userData.user.id)
+          .eq("user_id", userId)
           .eq("module_id", activeModule.id)
           .order("updated_at", { ascending: false })
           .limit(1);
@@ -595,7 +636,7 @@ export default function FormationPage() {
                         <p className="card-text">{question.prompt}</p>
 
                         <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                          {question.choices.map((choice) => (
+                          {(shuffledChoicesByQuestionId[question.id] ?? question.choices).map((choice) => (
                             <label key={choice.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                               <input
                                 type="radio"
