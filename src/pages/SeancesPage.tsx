@@ -80,6 +80,7 @@ export default function SeancesPage() {
   const [activeSession, setActiveSession] = useState<SessionItem | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
     let isMounted = true;
@@ -111,6 +112,11 @@ export default function SeancesPage() {
   const upcomingSessions = sessions
     .filter((session) => session.status?.toLowerCase() === "planned")
     .sort(sortWithNullDatesLastAscending);
+  const confirmedUpcomingSessions = upcomingSessions.filter((session) => {
+    const scheduledAt = parseDate(session.scheduled_at);
+    return scheduledAt !== null && scheduledAt >= now;
+  });
+  const sessionsToPlan = upcomingSessions.filter((session) => parseDate(session.scheduled_at) === null);
 
   const pastSessions = sessions
     .filter((session) => session.status?.toLowerCase() === "completed")
@@ -131,29 +137,50 @@ export default function SeancesPage() {
         <>
           <div className="section-block">
             <h3 className="subsection-title">À venir</h3>
-            {upcomingSessions.length === 0 && <div className="empty-state">Aucune séance à venir.</div>}
+            <h4 className="subsection-title">Rendez-vous confirmés</h4>
+            {confirmedUpcomingSessions.length === 0 && <div className="empty-state">Aucun rendez-vous confirmé pour le moment.</div>}
 
-            {upcomingSessions.length > 0 && (
+            {confirmedUpcomingSessions.length > 0 && (
               <div className="card-grid">
-                {upcomingSessions.map((session) => {
+                {confirmedUpcomingSessions.map((session) => {
                   const formattedDate = formatDate(session.scheduled_at);
 
                   return (
                     <article key={session.id} className="card">
-                      {formattedDate && <p className="card-meta">{formattedDate}</p>}
+                      <p className="card-meta">{formattedDate}</p>
                       <h3 className="card-title">{session.theme ?? "Séance sans thème"}</h3>
                       <p className="card-text clamp-2">{session.objective ?? "Objectif non renseigné."}</p>
 
                       {session.booking_url ? (
                         <a href={session.booking_url} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
-                          Réserver
+                          Replanifier
                         </a>
-                      ) : (
-                        <p className="card-meta card-action">Lien de réservation non disponible</p>
-                      )}
+                      ) : null}
                     </article>
                   );
                 })}
+              </div>
+            )}
+
+            <h4 className="subsection-title">À planifier</h4>
+            {sessionsToPlan.length === 0 && <div className="empty-state">Aucune séance à planifier.</div>}
+
+            {sessionsToPlan.length > 0 && (
+              <div className="card-grid">
+                {sessionsToPlan.map((session) => (
+                  <article key={session.id} className="card">
+                    <h3 className="card-title">{session.theme ?? "Séance sans thème"}</h3>
+                    <p className="card-text clamp-2">{session.objective ?? "Objectif non renseigné."}</p>
+
+                    {session.booking_url ? (
+                      <a href={session.booking_url} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                        Réserver
+                      </a>
+                    ) : (
+                      <p className="card-meta card-action">Lien de réservation non disponible</p>
+                    )}
+                  </article>
+                ))}
               </div>
             )}
 
