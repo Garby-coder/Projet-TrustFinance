@@ -117,6 +117,9 @@ export default function FormationPage() {
   const [activeFallbackLesson, setActiveFallbackLesson] = useState<FallbackLesson | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [passedByModuleId, setPassedByModuleId] = useState<Record<string, boolean>>({});
+  const [quizRequiredByModuleId, setQuizRequiredByModuleId] = useState<Record<string, boolean>>({});
 
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizError, setQuizError] = useState("");
@@ -157,6 +160,9 @@ export default function FormationPage() {
             setFallbackLessons((lessonsData ?? []) as FallbackLesson[]);
             setModules([]);
             setModuleLessons([]);
+            setUserId(null);
+            setPassedByModuleId({});
+            setQuizRequiredByModuleId({});
           }
 
           setLoading(false);
@@ -183,10 +189,72 @@ export default function FormationPage() {
       if (lessonsError) {
         setError(lessonsError.message);
       } else {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (!isMounted) {
+          return;
+        }
+
+        const currentUserId = userError ? null : (userData.user?.id ?? null);
+        const nextPassedByModuleId: Record<string, boolean> = {};
+        const nextQuizRequiredByModuleId: Record<string, boolean> = {};
+        const moduleRows = (modulesData ?? []) as ModuleItem[];
+        const moduleIds = moduleRows.map((module) => module.id);
+
+        if (currentUserId) {
+          const { data: progressRows, error: progressError } = await supabase
+            .from("module_quiz_progress")
+            .select("module_id,passed")
+            .eq("user_id", currentUserId);
+
+          if (!isMounted) {
+            return;
+          }
+
+          if (progressError) {
+            if (!isMissingQuizTable(progressError)) {
+              setError(progressError.message);
+            }
+          } else {
+            const rows = (progressRows ?? []) as Array<{ module_id: string | null; passed: boolean | null }>;
+            for (const row of rows) {
+              if (row.module_id && row.passed === true) {
+                nextPassedByModuleId[row.module_id] = true;
+              }
+            }
+          }
+        }
+
+        if (moduleIds.length > 0) {
+          const { data: moduleQuizRows, error: moduleQuizRowsError } = await supabase
+            .from("module_quizzes")
+            .select("module_id,is_published")
+            .in("module_id", moduleIds);
+
+          if (!isMounted) {
+            return;
+          }
+
+          if (moduleQuizRowsError) {
+            if (!isMissingQuizTable(moduleQuizRowsError)) {
+              setError(moduleQuizRowsError.message);
+            }
+          } else {
+            const rows = (moduleQuizRows ?? []) as Array<{ module_id: string | null; is_published: boolean | null }>;
+            for (const row of rows) {
+              if (row.module_id && row.is_published === true) {
+                nextQuizRequiredByModuleId[row.module_id] = true;
+              }
+            }
+          }
+        }
+
         setMode("modules");
-        setModules((modulesData ?? []) as ModuleItem[]);
+        setModules(moduleRows);
         setModuleLessons((lessonsData ?? []) as ModuleLesson[]);
         setFallbackLessons([]);
+        setUserId(currentUserId);
+        setPassedByModuleId(nextPassedByModuleId);
+        setQuizRequiredByModuleId(nextQuizRequiredByModuleId);
       }
 
       setLoading(false);
@@ -323,13 +391,6 @@ export default function FormationPage() {
           ...question,
           choices: (choicesByQuestion.get(question.id) ?? []).sort((a, b) => a.order_index - b.order_index),
         }));
-
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (!isMounted) {
-        return;
-      }
-
-      const userId = userError ? null : (userData.user?.id ?? null);
       const shuffledMap: Record<string, QuizChoiceRow[]> = {};
       for (const question of structuredQuestions) {
         const seedString = userId ? `${userId}:${activeModule.id}:${question.id}` : `${activeModule.id}:${question.id}`;
@@ -369,7 +430,11 @@ export default function FormationPage() {
           return;
         }
 
-        setPassed(progressRows?.[0]?.passed === true);
+        const modulePassed = progressRows?.[0]?.passed === true;
+        setPassed(modulePassed);
+        setPassedByModuleId((current) => ({ ...current, [activeModule.id]: modulePassed }));
+      } else {
+        setPassed(false);
       }
 
       setLoadedQuizModuleId(activeModule.id);
@@ -379,14 +444,36 @@ export default function FormationPage() {
     return () => {
       isMounted = false;
     };
-  }, [activeTab, activeModule, loadedQuizModuleId]);
+  }, [activeTab, activeModule, loadedQuizModuleId, userId]);
 
   const activeModuleLessons = activeModule
     ? moduleLessons.filter((lesson) => lesson.module_id === activeModule.id).sort((a, b) => a.order_index - b.order_index)
     : [];
   const activeLesson = activeModuleLessons.find((lesson) => lesson.id === activeLessonId) ?? activeModuleLessons[0] ?? null;
+  const modulesSorted = [...modules].sort((a, b) => a.order_index - b.order_index);
+  const unlockedByModuleId: Record<string, boolean> = {};
+
+  for (let index = 0; index < modulesSorted.length; index += 1) {
+    const currentModule = modulesSorted[index];
+
+    if (index === 0) {
+      unlockedByModuleId[currentModule.id] = true;
+      continue;
+    }
+
+    const previousModule = modulesSorted[index - 1];
+    const quizRequiredForPrevious = quizRequiredByModuleId[previousModule.id] === true;
+    const quizPassedForPrevious = !quizRequiredForPrevious || passedByModuleId[previousModule.id] === true;
+    unlockedByModuleId[currentModule.id] = quizPassedForPrevious;
+  }
+
+  const isActiveModuleUnlocked = activeModule ? unlockedByModuleId[activeModule.id] === true : false;
 
   function openModule(module: ModuleItem) {
+    if (unlockedByModuleId[module.id] !== true) {
+      return;
+    }
+
     const lessons = moduleLessons.filter((lesson) => lesson.module_id === module.id).sort((a, b) => a.order_index - b.order_index);
     setActiveModule(module);
     setActiveLessonId(lessons[0]?.id ?? null);
@@ -430,8 +517,19 @@ export default function FormationPage() {
     setQuizSubmitting(true);
     setQuizSubmitMessage("");
 
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user?.id) {
+    let currentUserId = userId;
+    if (!currentUserId) {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user?.id) {
+        setQuizSubmitMessage("Impossible d'identifier l'utilisateur.");
+        setQuizSubmitting(false);
+        return;
+      }
+      currentUserId = userData.user.id;
+      setUserId(currentUserId);
+    }
+
+    if (!currentUserId) {
       setQuizSubmitMessage("Impossible d'identifier l'utilisateur.");
       setQuizSubmitting(false);
       return;
@@ -440,7 +538,7 @@ export default function FormationPage() {
     const nowIso = new Date().toISOString();
     const { error: upsertError } = await supabase.from("module_quiz_progress").upsert(
       {
-        user_id: userData.user.id,
+        user_id: currentUserId,
         module_id: activeModule.id,
         passed: true,
         passed_at: nowIso,
@@ -462,6 +560,7 @@ export default function FormationPage() {
     }
 
     setPassed(true);
+    setPassedByModuleId((current) => ({ ...current, [activeModule.id]: true }));
     setQuizSubmitMessage("Quiz réussi.");
     setQuizSubmitting(false);
   }
@@ -479,22 +578,33 @@ export default function FormationPage() {
 
       {!loading && mode === "modules" && modules.length > 0 && (
         <div className="card-grid">
-          {modules.map((module) => (
-            <button
-              key={module.id}
-              type="button"
-              className="card-button"
-              onClick={() => openModule(module)}
-              aria-label={`Ouvrir le module ${module.title}`}
-            >
-              <p className="card-meta">Module {module.order_index}</p>
-              <h3 className="card-title">{module.title}</h3>
-              <p className="card-text clamp-2">{module.description ?? "Aucune description."}</p>
-              <p className="card-meta" style={{ marginTop: 10 }}>
-                {getLessonCount(module.id)} leçon(s)
-              </p>
-            </button>
-          ))}
+          {modulesSorted.map((module) => {
+            const isUnlocked = unlockedByModuleId[module.id] === true;
+
+            return (
+              <button
+                key={module.id}
+                type="button"
+                className="card-button"
+                onClick={() => openModule(module)}
+                aria-label={`Ouvrir le module ${module.title}`}
+                disabled={!isUnlocked}
+                style={!isUnlocked ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
+              >
+                <p className="card-meta">Module {module.order_index}</p>
+                <h3 className="card-title">{module.title}</h3>
+                <p className="card-text clamp-2">{module.description ?? "Aucune description."}</p>
+                <p className="card-meta" style={{ marginTop: 10 }}>
+                  {getLessonCount(module.id)} leçon(s)
+                </p>
+                {!isUnlocked && (
+                  <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
+                    Verrouillé — valide le quiz du module précédent
+                  </p>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -533,156 +643,164 @@ export default function FormationPage() {
               </button>
             </div>
 
-            <div role="tablist" aria-label="Contenu du module" style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setActiveTab("lessons")}
-                aria-pressed={activeTab === "lessons"}
-                style={activeTab === "lessons" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
-              >
-                Leçons
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setActiveTab("quiz")}
-                aria-pressed={activeTab === "quiz"}
-                style={activeTab === "quiz" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
-              >
-                Quiz
-              </button>
-            </div>
-
-            {activeTab === "lessons" && (
-              <>
-                {activeModuleLessons.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
-
-                {activeModuleLessons.length > 0 && (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {activeModuleLessons.map((lesson) => {
-                      const isActive = activeLesson?.id === lesson.id;
-
-                      return (
-                        <button
-                          key={lesson.id}
-                          type="button"
-                          className="card-button"
-                          onClick={() => setActiveLessonId(lesson.id)}
-                          style={isActive ? { borderColor: "#111827" } : undefined}
-                          aria-label={`Ouvrir la leçon ${lesson.title}`}
-                        >
-                          <h4 className="card-title">{lesson.title}</h4>
-                          <p className="card-meta">
-                            {getLessonTypeLabel(lesson.content_type)}
-                            {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {activeLesson && (
-                  <div style={{ marginTop: 14 }}>
-                    <h4 className="subsection-title">{activeLesson.title}</h4>
-
-                    {activeLesson.content_type?.toLowerCase() === "video" && (
-                      <>
-                        {activeLesson.tella_url ? (
-                          <div className="modal-video">
-                            <iframe
-                              src={activeLesson.tella_url}
-                              title={activeLesson.title}
-                              allow="autoplay; fullscreen; picture-in-picture"
-                              allowFullScreen
-                            />
-                          </div>
-                        ) : (
-                          <div className="empty-state">Vidéo indisponible pour cette leçon.</div>
-                        )}
-                      </>
-                    )}
-
-                    {activeLesson.content_type?.toLowerCase() === "lecture" && (
-                      <>
-                        {activeLesson.content_markdown ? (
-                          <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
-                            {activeLesson.content_markdown}
-                          </p>
-                        ) : (
-                          <div className="empty-state">Contenu de lecture indisponible pour cette leçon.</div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </>
+            {!isActiveModuleUnlocked && (
+              <div className="empty-state">Verrouillé — valide le quiz du module précédent.</div>
             )}
 
-            {activeTab === "quiz" && (
+            {isActiveModuleUnlocked && (
               <>
-                {quizLoading && <p className="muted">Chargement du quiz...</p>}
-                {!quizLoading && quizError && <div className="error-box">Erreur Supabase: {quizError}</div>}
-                {!quizLoading && !quizError && (quizUnavailable || quizQuestions.length === 0) && (
-                  <div className="empty-state">Quiz non disponible.</div>
-                )}
+                <div role="tablist" aria-label="Contenu du module" style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setActiveTab("lessons")}
+                    aria-pressed={activeTab === "lessons"}
+                    style={activeTab === "lessons" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
+                  >
+                    Leçons
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setActiveTab("quiz")}
+                    aria-pressed={activeTab === "quiz"}
+                    style={activeTab === "quiz" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
+                  >
+                    Quiz
+                  </button>
+                </div>
 
-                {!quizLoading && !quizError && !quizUnavailable && quizQuestions.length > 0 && (
-                  <div style={{ display: "grid", gap: 12 }}>
-                    {quizQuestions.map((question, questionIndex) => (
-                      <div key={question.id} className="card">
-                        <p className="card-meta">Question {questionIndex + 1}</p>
-                        <p className="card-text">{question.prompt}</p>
+                {activeTab === "lessons" && (
+                  <>
+                    {activeModuleLessons.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
 
-                        <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                          {(shuffledChoicesByQuestionId[question.id] ?? question.choices).map((choice) => (
-                            <label key={choice.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                              <input
-                                type="radio"
-                                name={`question-${question.id}`}
-                                value={choice.id}
-                                checked={selectedAnswers[question.id] === choice.id}
-                                onChange={() => {
-                                  setSelectedAnswers((current) => ({ ...current, [question.id]: choice.id }));
-                                  if (quizSubmitMessage) {
-                                    setQuizSubmitMessage("");
-                                  }
-                                }}
-                                disabled={passed === true || quizSubmitting}
-                              />
-                              <span>{choice.label}</span>
-                            </label>
-                          ))}
-                        </div>
+                    {activeModuleLessons.length > 0 && (
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {activeModuleLessons.map((lesson) => {
+                          const isActive = activeLesson?.id === lesson.id;
 
-                        {question.explanation && passed === true && (
-                          <p className="card-meta" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
-                            Explication: {question.explanation}
-                          </p>
-                        )}
+                          return (
+                            <button
+                              key={lesson.id}
+                              type="button"
+                              className="card-button"
+                              onClick={() => setActiveLessonId(lesson.id)}
+                              style={isActive ? { borderColor: "#111827" } : undefined}
+                              aria-label={`Ouvrir la leçon ${lesson.title}`}
+                            >
+                              <h4 className="card-title">{lesson.title}</h4>
+                              <p className="card-meta">
+                                {getLessonTypeLabel(lesson.content_type)}
+                                {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
+                              </p>
+                            </button>
+                          );
+                        })}
                       </div>
-                    ))}
-
-                    {passed === true && <div className="empty-state">Quiz réussi.</div>}
-
-                    {passed !== true && quizSubmitMessage && (
-                      <p className="card-text" style={{ color: "#991b1b", margin: 0 }}>
-                        {quizSubmitMessage}
-                      </p>
                     )}
 
-                    <div>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => void submitQuiz()}
-                        disabled={passed === true || quizSubmitting}
-                      >
-                        {quizSubmitting ? "Envoi..." : "Soumettre le quiz"}
-                      </button>
-                    </div>
-                  </div>
+                    {activeLesson && (
+                      <div style={{ marginTop: 14 }}>
+                        <h4 className="subsection-title">{activeLesson.title}</h4>
+
+                        {activeLesson.content_type?.toLowerCase() === "video" && (
+                          <>
+                            {activeLesson.tella_url ? (
+                              <div className="modal-video">
+                                <iframe
+                                  src={activeLesson.tella_url}
+                                  title={activeLesson.title}
+                                  allow="autoplay; fullscreen; picture-in-picture"
+                                  allowFullScreen
+                                />
+                              </div>
+                            ) : (
+                              <div className="empty-state">Vidéo indisponible pour cette leçon.</div>
+                            )}
+                          </>
+                        )}
+
+                        {activeLesson.content_type?.toLowerCase() === "lecture" && (
+                          <>
+                            {activeLesson.content_markdown ? (
+                              <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
+                                {activeLesson.content_markdown}
+                              </p>
+                            ) : (
+                              <div className="empty-state">Contenu de lecture indisponible pour cette leçon.</div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {activeTab === "quiz" && (
+                  <>
+                    {quizLoading && <p className="muted">Chargement du quiz...</p>}
+                    {!quizLoading && quizError && <div className="error-box">Erreur Supabase: {quizError}</div>}
+                    {!quizLoading && !quizError && (quizUnavailable || quizQuestions.length === 0) && (
+                      <div className="empty-state">Quiz non disponible.</div>
+                    )}
+
+                    {!quizLoading && !quizError && !quizUnavailable && quizQuestions.length > 0 && (
+                      <div style={{ display: "grid", gap: 12 }}>
+                        {quizQuestions.map((question, questionIndex) => (
+                          <div key={question.id} className="card">
+                            <p className="card-meta">Question {questionIndex + 1}</p>
+                            <p className="card-text">{question.prompt}</p>
+
+                            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                              {(shuffledChoicesByQuestionId[question.id] ?? question.choices).map((choice) => (
+                                <label key={choice.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                                  <input
+                                    type="radio"
+                                    name={`question-${question.id}`}
+                                    value={choice.id}
+                                    checked={selectedAnswers[question.id] === choice.id}
+                                    onChange={() => {
+                                      setSelectedAnswers((current) => ({ ...current, [question.id]: choice.id }));
+                                      if (quizSubmitMessage) {
+                                        setQuizSubmitMessage("");
+                                      }
+                                    }}
+                                    disabled={passed === true || quizSubmitting}
+                                  />
+                                  <span>{choice.label}</span>
+                                </label>
+                              ))}
+                            </div>
+
+                            {question.explanation && passed === true && (
+                              <p className="card-meta" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
+                                Explication: {question.explanation}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+
+                        {passed === true && <div className="empty-state">Quiz réussi.</div>}
+
+                        {passed !== true && quizSubmitMessage && (
+                          <p className="card-text" style={{ color: "#991b1b", margin: 0 }}>
+                            {quizSubmitMessage}
+                          </p>
+                        )}
+
+                        <div>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => void submitQuiz()}
+                            disabled={passed === true || quizSubmitting}
+                          >
+                            {quizSubmitting ? "Envoi..." : "Soumettre le quiz"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
