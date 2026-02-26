@@ -107,9 +107,19 @@ function sortByProgressOrder(a: SessionItem, b: SessionItem) {
   return a.id.localeCompare(b.id, "fr");
 }
 
+function isValidRecordingUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export default function SeancesPage() {
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [activeSession, setActiveSession] = useState<SessionItem | null>(null);
+  const [showRecording, setShowRecording] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [lockingEnabled, setLockingEnabled] = useState(true);
@@ -163,6 +173,10 @@ export default function SeancesPage() {
     };
   }, []);
 
+  useEffect(() => {
+    setShowRecording(false);
+  }, [activeSession?.id]);
+
   const upcomingSessions = sessions
     .filter((session) => session.status?.toLowerCase() === "planned")
     .sort(sortWithNullDatesLastAscending);
@@ -197,6 +211,14 @@ export default function SeancesPage() {
     .filter((session) => session.status?.toLowerCase() === "completed")
     .sort(sortWithNullDatesLastDescending);
   const activeSessionDate = activeSession ? formatDate(activeSession.scheduled_at) : null;
+  const activeRecordingUrl = activeSession?.recording_url?.trim() ?? "";
+  const hasRecordingUrl = activeRecordingUrl.length > 0;
+  const canEmbedRecording = hasRecordingUrl && isValidRecordingUrl(activeRecordingUrl);
+
+  function closeActiveSessionModal() {
+    setShowRecording(false);
+    setActiveSession(null);
+  }
 
   return (
     <section>
@@ -304,14 +326,14 @@ export default function SeancesPage() {
       )}
 
       {activeSession && (
-        <div className="modal-backdrop" onClick={() => setActiveSession(null)}>
+        <div className="modal-backdrop" onClick={closeActiveSessionModal}>
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h3 className="modal-title">{activeSession.theme ?? "Séance sans thème"}</h3>
                 {activeSessionDate && <p className="modal-date">{activeSessionDate}</p>}
               </div>
-              <button type="button" className="btn" onClick={() => setActiveSession(null)}>
+              <button type="button" className="btn" onClick={closeActiveSessionModal}>
                 Fermer
               </button>
             </div>
@@ -321,11 +343,28 @@ export default function SeancesPage() {
               <p className="card-text preserve-line-breaks">{activeSession.summary ?? "Aucun résumé."}</p>
             </div>
 
-            {activeSession.recording_url && (
+            {hasRecordingUrl && (
               <div className="modal-section">
-                <a href={activeSession.recording_url} target="_blank" rel="noreferrer" className="btn btn-primary">
-                  Ouvrir l'enregistrement
-                </a>
+                <button type="button" className="btn btn-primary" onClick={() => setShowRecording((current) => !current)}>
+                  {showRecording ? "Masquer l'enregistrement" : "Afficher l'enregistrement"}
+                </button>
+
+                {showRecording && (
+                  <div style={{ marginTop: 12 }}>
+                    {canEmbedRecording ? (
+                      <div style={{ width: "100%", aspectRatio: "16 / 9" }}>
+                        <iframe
+                          src={activeRecordingUrl}
+                          title="Enregistrement de la séance"
+                          style={{ width: "100%", height: "100%", border: 0 }}
+                          allowFullScreen
+                        />
+                      </div>
+                    ) : (
+                      <p className="card-text">Lien d’enregistrement invalide.</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
