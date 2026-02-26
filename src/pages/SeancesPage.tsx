@@ -174,7 +174,6 @@ export default function SeancesPage() {
   const sessionsByOrder = [...sessions].sort(sortByProgressOrder);
   const nextRequired = sessionsByOrder.find((session) => session.status?.toLowerCase() !== "completed");
   const nextRequiredId = lockingEnabled ? (nextRequired?.id ?? null) : null;
-  const freeSessionLocked = lockingEnabled && Boolean(nextRequired);
 
   function isUnlocked(session: SessionItem) {
     if (!lockingEnabled) {
@@ -267,13 +266,9 @@ export default function SeancesPage() {
             <div className="card free-session-card">
               <h4 className="card-title">Séance libre (sujet au choix)</h4>
               <p className="card-text">Réservez un créneau libre pour traiter votre besoin du moment.</p>
-              {!freeSessionLocked ? (
-                <a href={CALENDLY_FREE_URL} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
-                  Réserver
-                </a>
-              ) : (
-                <p className="card-meta card-action">Verrouillé — termine la séance précédente</p>
-              )}
+              <a href={CALENDLY_FREE_URL} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                Réserver
+              </a>
             </div>
 
             <TasksWidget />

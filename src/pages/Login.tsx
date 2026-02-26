@@ -1,22 +1,31 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
+function toLoginErrorMessage(errorMessage: string) {
+  const normalized = errorMessage.toLowerCase();
+  if (
+    normalized.includes("invalid login credentials") ||
+    normalized.includes("user already registered") ||
+    normalized.includes("signup") ||
+    normalized.includes("sign up")
+  ) {
+    return "Identifiants invalides.";
+  }
+
+  return "Impossible de se connecter pour le moment.";
+}
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string>("");
 
-  async function signUp() {
-    setMsg("");
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) setMsg(error.message);
-    else setMsg("Compte créé. Vérifie tes emails si confirmation activée.");
-  }
-
   async function signIn() {
     setMsg("");
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setMsg(error.message);
+    if (error) {
+      setMsg(toLoginErrorMessage(error.message));
+    }
   }
 
   return (
@@ -49,10 +58,11 @@ export default function Login() {
           <button type="button" className="btn btn-primary" onClick={() => void signIn()}>
             Se connecter
           </button>
-          <button type="button" className="btn" onClick={() => void signUp()}>
-            Créer un compte
-          </button>
         </div>
+
+        <p className="card-meta" style={{ marginTop: 12 }}>
+          Accès réservé aux clients TrustFinance. Si tu n’as pas encore reçu tes identifiants, contacte ton coach.
+        </p>
 
         {msg && <p className="message">{msg}</p>}
       </div>
