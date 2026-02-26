@@ -7,6 +7,8 @@ const CALENDLY_FREE_URL = "https://calendly.com/trustfinanceam/reserve-ton-appel
 type SessionItem = {
   id: string;
   status: string | null;
+  order_index: number | null;
+  created_at: string | null;
   theme: string | null;
   objective: string | null;
   booking_url: string | null;
@@ -75,21 +77,67 @@ function sortWithNullDatesLastDescending(a: SessionItem, b: SessionItem) {
   return timeB - timeA;
 }
 
+function isOrderIndexMissingColumnError(errorMessage: string) {
+  const normalizedMessage = errorMessage.toLowerCase();
+  return (
+    normalizedMessage.includes("order_index") &&
+    (normalizedMessage.includes("column") || normalizedMessage.includes("does not exist"))
+  );
+}
+
+function sortByProgressOrder(a: SessionItem, b: SessionItem) {
+  const orderA = a.order_index ?? Number.POSITIVE_INFINITY;
+  const orderB = b.order_index ?? Number.POSITIVE_INFINITY;
+  if (orderA !== orderB) {
+    return orderA - orderB;
+  }
+
+  const createdAtA = parseDate(a.created_at);
+  const createdAtB = parseDate(b.created_at);
+  if (createdAtA !== null && createdAtB !== null && createdAtA !== createdAtB) {
+    return createdAtA - createdAtB;
+  }
+  if (createdAtA === null && createdAtB !== null) {
+    return 1;
+  }
+  if (createdAtA !== null && createdAtB === null) {
+    return -1;
+  }
+
+  return a.id.localeCompare(b.id, "fr");
+}
+
 export default function SeancesPage() {
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [activeSession, setActiveSession] = useState<SessionItem | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [lockingEnabled, setLockingEnabled] = useState(true);
   const [now] = useState(() => Date.now());
 
   useEffect(() => {
     let isMounted = true;
 
     (async () => {
-      const { data, error } = await supabase
+      setError("");
+
+      const primarySelect =
+        "id,status,order_index,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
+      const fallbackSelect =
+        "id,status,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
+
+      let disableLocking = false;
+      let { data, error } = await supabase
         .from("sessions")
-        .select("id,status,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript")
+        .select(primarySelect)
         .order("scheduled_at", { ascending: true });
+
+      if (error && isOrderIndexMissingColumnError(error.message)) {
+        disableLocking = true;
+        const fallbackResponse = await supabase.from("sessions").select(fallbackSelect).order("scheduled_at", { ascending: true });
+        data = fallbackResponse.data as SessionItem[] | null;
+        error = fallbackResponse.error;
+      }
 
       if (!isMounted) {
         return;
@@ -97,8 +145,14 @@ export default function SeancesPage() {
 
       if (error) {
         setError(error.message);
+        setLockingEnabled(false);
       } else {
-        setSessions(data ?? []);
+        const normalizedSessions = disableLocking
+          ? ((data ?? []) as Array<Omit<SessionItem, "order_index">>).map((session) => ({ ...session, order_index: null }))
+          : ((data ?? []) as SessionItem[]);
+
+        setSessions(normalizedSessions);
+        setLockingEnabled(!disableLocking);
       }
 
       setLoading(false);
@@ -117,6 +171,28 @@ export default function SeancesPage() {
     return scheduledAt !== null && scheduledAt >= now;
   });
   const sessionsToPlan = upcomingSessions.filter((session) => parseDate(session.scheduled_at) === null);
+  const sessionsByOrder = [...sessions].sort(sortByProgressOrder);
+  const nextRequired = sessionsByOrder.find((session) => session.status?.toLowerCase() !== "completed");
+  const nextRequiredId = lockingEnabled ? (nextRequired?.id ?? null) : null;
+  const freeSessionLocked = lockingEnabled && Boolean(nextRequired);
+
+  function isUnlocked(session: SessionItem) {
+    if (!lockingEnabled) {
+      return true;
+    }
+    if (session.status?.toLowerCase() === "completed") {
+      return true;
+    }
+    if (!nextRequiredId) {
+      return true;
+    }
+
+    return session.id === nextRequiredId;
+  }
+
+  function isLockedPlanned(session: SessionItem) {
+    return session.status?.toLowerCase() === "planned" && !isUnlocked(session);
+  }
 
   const pastSessions = sessions
     .filter((session) => session.status?.toLowerCase() === "completed")
@@ -151,10 +227,12 @@ export default function SeancesPage() {
                       <h3 className="card-title">{session.theme ?? "Séance sans thème"}</h3>
                       <p className="card-text clamp-2">{session.objective ?? "Objectif non renseigné."}</p>
 
-                      {session.booking_url ? (
+                      {session.booking_url && !isLockedPlanned(session) ? (
                         <a href={session.booking_url} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
                           Replanifier
                         </a>
+                      ) : isLockedPlanned(session) ? (
+                        <p className="card-meta card-action">Verrouillé — termine la séance précédente</p>
                       ) : null}
                     </article>
                   );
@@ -172,10 +250,12 @@ export default function SeancesPage() {
                     <h3 className="card-title">{session.theme ?? "Séance sans thème"}</h3>
                     <p className="card-text clamp-2">{session.objective ?? "Objectif non renseigné."}</p>
 
-                    {session.booking_url ? (
+                    {session.booking_url && !isLockedPlanned(session) ? (
                       <a href={session.booking_url} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
                         Réserver
                       </a>
+                    ) : isLockedPlanned(session) ? (
+                      <p className="card-meta card-action">Verrouillé — termine la séance précédente</p>
                     ) : (
                       <p className="card-meta card-action">Lien de réservation non disponible</p>
                     )}
@@ -187,9 +267,13 @@ export default function SeancesPage() {
             <div className="card free-session-card">
               <h4 className="card-title">Séance libre (sujet au choix)</h4>
               <p className="card-text">Réservez un créneau libre pour traiter votre besoin du moment.</p>
-              <a href={CALENDLY_FREE_URL} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
-                Réserver
-              </a>
+              {!freeSessionLocked ? (
+                <a href={CALENDLY_FREE_URL} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                  Réserver
+                </a>
+              ) : (
+                <p className="card-meta card-action">Verrouillé — termine la séance précédente</p>
+              )}
             </div>
 
             <TasksWidget />
