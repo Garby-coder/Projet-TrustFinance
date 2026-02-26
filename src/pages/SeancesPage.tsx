@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import TasksWidget from "../components/TasksWidget";
 import { supabase } from "../lib/supabase";
 
-const CALENDLY_FREE_URL = "https://calendly.com/your-link";
+const CALENDLY_FREE_URL = "https://calendly.com/trustfinanceam/reserve-ton-appel-avec-matheo-aalberg-clone";
 
 type SessionItem = {
   id: string;
