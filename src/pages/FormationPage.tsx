@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { registerEngagementAction } from "../lib/engagement";
 
 type ModuleItem = {
   id: string;
@@ -66,6 +67,48 @@ function isMissingQuizTable(error: { code?: string; message: string }) {
   );
 }
 
+function isMissingLessonProgressTable(error: { code?: string; message: string }) {
+  const message = error.message.toLowerCase();
+  return error.code === "42P01" || (message.includes("does not exist") && message.includes("lesson_progress"));
+}
+
+function isMissingColumnError(error: { code?: string; message: string }) {
+  const message = error.message.toLowerCase();
+  return error.code === "42703" || (message.includes("column") && message.includes("does not exist"));
+}
+
+async function upsertLessonProgress(userId: string, lessonId: string) {
+  const nowIso = new Date().toISOString();
+  const payloads: Array<Record<string, string | boolean>> = [
+    { user_id: userId, lesson_id: lessonId, is_done: true, completed_at: nowIso, updated_at: nowIso },
+    { user_id: userId, lesson_id: lessonId, done: true, completed_at: nowIso, updated_at: nowIso },
+    { user_id: userId, lesson_id: lessonId, completed: true, completed_at: nowIso, updated_at: nowIso },
+    { user_id: userId, lesson_id: lessonId, status: "done", completed_at: nowIso, updated_at: nowIso },
+    { user_id: userId, lesson_id: lessonId, completed_at: nowIso, updated_at: nowIso },
+    { user_id: userId, lesson_id: lessonId },
+  ];
+
+  let lastColumnError: { code?: string; message: string } | null = null;
+
+  for (const payload of payloads) {
+    const { error } = await supabase.from("lesson_progress").upsert(payload, { onConflict: "user_id,lesson_id" });
+    if (!error) {
+      return;
+    }
+
+    if (isMissingColumnError(error)) {
+      lastColumnError = error;
+      continue;
+    }
+
+    throw error;
+  }
+
+  if (lastColumnError) {
+    throw lastColumnError;
+  }
+}
+
 function getLessonTypeLabel(contentType: string | null) {
   return contentType?.toLowerCase() === "video" ? "Vidéo" : "Lecture";
 }
@@ -118,6 +161,9 @@ export default function FormationPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [completedByLessonId, setCompletedByLessonId] = useState<Record<string, boolean>>({});
+  const [lessonProgressMessage, setLessonProgressMessage] = useState("");
+  const [lessonProgressSubmittingId, setLessonProgressSubmittingId] = useState<string | null>(null);
   const [passedByModuleId, setPassedByModuleId] = useState<Record<string, boolean>>({});
   const [quizRequiredByModuleId, setQuizRequiredByModuleId] = useState<Record<string, boolean>>({});
 
@@ -161,6 +207,9 @@ export default function FormationPage() {
             setModules([]);
             setModuleLessons([]);
             setUserId(null);
+            setCompletedByLessonId({});
+            setLessonProgressMessage("");
+            setLessonProgressSubmittingId(null);
             setPassedByModuleId({});
             setQuizRequiredByModuleId({});
           }
@@ -195,12 +244,35 @@ export default function FormationPage() {
         }
 
         const currentUserId = userError ? null : (userData.user?.id ?? null);
+        const nextCompletedByLessonId: Record<string, boolean> = {};
         const nextPassedByModuleId: Record<string, boolean> = {};
         const nextQuizRequiredByModuleId: Record<string, boolean> = {};
         const moduleRows = (modulesData ?? []) as ModuleItem[];
         const moduleIds = moduleRows.map((module) => module.id);
 
         if (currentUserId) {
+          const { data: lessonProgressRows, error: lessonProgressError } = await supabase
+            .from("lesson_progress")
+            .select("lesson_id")
+            .eq("user_id", currentUserId);
+
+          if (!isMounted) {
+            return;
+          }
+
+          if (lessonProgressError) {
+            if (!isMissingLessonProgressTable(lessonProgressError)) {
+              setError(lessonProgressError.message);
+            }
+          } else {
+            const rows = (lessonProgressRows ?? []) as Array<{ lesson_id: string | null }>;
+            for (const row of rows) {
+              if (row.lesson_id) {
+                nextCompletedByLessonId[row.lesson_id] = true;
+              }
+            }
+          }
+
           const { data: progressRows, error: progressError } = await supabase
             .from("module_quiz_progress")
             .select("module_id,passed")
@@ -253,6 +325,9 @@ export default function FormationPage() {
         setModuleLessons((lessonsData ?? []) as ModuleLesson[]);
         setFallbackLessons([]);
         setUserId(currentUserId);
+        setCompletedByLessonId(nextCompletedByLessonId);
+        setLessonProgressMessage("");
+        setLessonProgressSubmittingId(null);
         setPassedByModuleId(nextPassedByModuleId);
         setQuizRequiredByModuleId(nextQuizRequiredByModuleId);
       }
@@ -450,6 +525,7 @@ export default function FormationPage() {
     ? moduleLessons.filter((lesson) => lesson.module_id === activeModule.id).sort((a, b) => a.order_index - b.order_index)
     : [];
   const activeLesson = activeModuleLessons.find((lesson) => lesson.id === activeLessonId) ?? activeModuleLessons[0] ?? null;
+  const isActiveLessonCompleted = activeLesson ? completedByLessonId[activeLesson.id] === true : false;
   const modulesSorted = [...modules].sort((a, b) => a.order_index - b.order_index);
   const unlockedByModuleId: Record<string, boolean> = {};
 
@@ -490,6 +566,62 @@ export default function FormationPage() {
 
   function getLessonCount(moduleId: string) {
     return moduleLessons.filter((lesson) => lesson.module_id === moduleId).length;
+  }
+
+  async function markLessonAsCompleted(lessonId: string) {
+    if (completedByLessonId[lessonId] === true || lessonProgressSubmittingId === lessonId) {
+      return;
+    }
+
+    let currentUserId = userId;
+    if (!currentUserId) {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user?.id) {
+        setLessonProgressMessage("Impossible d'identifier l'utilisateur.");
+        return;
+      }
+
+      currentUserId = userData.user.id;
+      setUserId(currentUserId);
+    }
+
+    if (!currentUserId) {
+      setLessonProgressMessage("Impossible d'identifier l'utilisateur.");
+      return;
+    }
+
+    setLessonProgressMessage("");
+    setLessonProgressSubmittingId(lessonId);
+
+    try {
+      await upsertLessonProgress(currentUserId, lessonId);
+      setCompletedByLessonId((current) => ({ ...current, [lessonId]: true }));
+
+      void (async () => {
+        try {
+          const result = await registerEngagementAction({
+            userId: currentUserId,
+            eventKey: `lesson_done:${lessonId}`,
+            xpGain: 10,
+          });
+
+          if (result.applied) {
+            window.dispatchEvent(new CustomEvent("tf:engagement", { detail: result }));
+          }
+        } catch (engagementError) {
+          console.warn("Impossible d'attribuer les XP de la leçon.", engagementError);
+        }
+      })();
+    } catch (progressError) {
+      const err = progressError as { code?: string; message?: string };
+      if (err.message && isMissingLessonProgressTable({ code: err.code, message: err.message })) {
+        setLessonProgressMessage("Progression des leçons indisponible.");
+      } else {
+        setLessonProgressMessage("Impossible d'enregistrer la progression de la leçon.");
+      }
+    } finally {
+      setLessonProgressSubmittingId((current) => (current === lessonId ? null : current));
+    }
   }
 
   async function submitQuiz() {
@@ -563,6 +695,22 @@ export default function FormationPage() {
     setPassedByModuleId((current) => ({ ...current, [activeModule.id]: true }));
     setQuizSubmitMessage("Quiz réussi.");
     setQuizSubmitting(false);
+
+    void (async () => {
+      try {
+        const result = await registerEngagementAction({
+          userId: currentUserId,
+          eventKey: `quiz_passed:${activeModule.id}`,
+          xpGain: 60,
+        });
+
+        if (result.applied) {
+          window.dispatchEvent(new CustomEvent("tf:engagement", { detail: result }));
+        }
+      } catch (engagementError) {
+        console.warn("Impossible d'attribuer les XP du quiz.", engagementError);
+      }
+    })();
   }
 
   return (
@@ -731,6 +879,27 @@ export default function FormationPage() {
                             )}
                           </>
                         )}
+
+                        <div style={{ marginTop: 14 }}>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => void markLessonAsCompleted(activeLesson.id)}
+                            disabled={isActiveLessonCompleted || lessonProgressSubmittingId === activeLesson.id}
+                          >
+                            {isActiveLessonCompleted
+                              ? "Leçon terminée"
+                              : lessonProgressSubmittingId === activeLesson.id
+                                ? "Enregistrement..."
+                                : "Marquer comme terminée"}
+                          </button>
+
+                          {lessonProgressMessage && !isActiveLessonCompleted && (
+                            <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
+                              {lessonProgressMessage}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </>
