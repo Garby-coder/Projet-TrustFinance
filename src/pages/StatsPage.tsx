@@ -78,6 +78,26 @@ function formatDate(dateValue: string | null | undefined) {
   }).format(new Date(timestamp));
 }
 
+function toLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateKeyReadable(dateKey: string) {
+  const [yearRaw, monthRaw, dayRaw] = dateKey.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return dateKey;
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "full" }).format(new Date(year, month - 1, day));
+}
+
 function isMissingModulesTable(error: { code?: string; message: string }) {
   const message = error.message.toLowerCase();
   return error.code === "42P01" || (message.includes("does not exist") && message.includes("modules"));
@@ -219,6 +239,7 @@ export default function StatsPage() {
   const [quizSubmitMessage, setQuizSubmitMessage] = useState("");
   const [quizSubmitting, setQuizSubmitting] = useState(false);
   const [loadedQuizModuleId, setLoadedQuizModuleId] = useState<string | null>(null);
+  const [selectedCalendarDateKey, setSelectedCalendarDateKey] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -484,6 +505,59 @@ export default function StatsPage() {
       return timeA - timeB;
     })
     .slice(0, 3);
+
+  const sessionsByDateKey: Record<string, SessionItem[]> = {};
+  for (const session of sessions) {
+    const sessionTimestamp = parseDate(session.scheduled_at);
+    if (sessionTimestamp === null) {
+      continue;
+    }
+
+    const dateKey = toLocalDateKey(new Date(sessionTimestamp));
+    const list = sessionsByDateKey[dateKey] ?? [];
+    list.push(session);
+    sessionsByDateKey[dateKey] = list;
+  }
+
+  for (const dateKey of Object.keys(sessionsByDateKey)) {
+    sessionsByDateKey[dateKey].sort((a, b) => {
+      const timeA = parseDate(a.scheduled_at) ?? 0;
+      const timeB = parseDate(b.scheduled_at) ?? 0;
+      return timeA - timeB;
+    });
+  }
+
+  const nowDate = new Date();
+  const currentMonthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1);
+  const currentMonthLabel = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(currentMonthStart);
+  const firstWeekdayOffset = (currentMonthStart.getDay() + 6) % 7;
+  const daysInCurrentMonth = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() + 1, 0).getDate();
+  const weekdayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+  const calendarCells: Array<{ kind: "empty" } | { kind: "day"; day: number; dateKey: string; hasSessions: boolean }> = [];
+
+  for (let index = 0; index < firstWeekdayOffset; index += 1) {
+    calendarCells.push({ kind: "empty" });
+  }
+
+  for (let day = 1; day <= daysInCurrentMonth; day += 1) {
+    const date = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth(), day);
+    const dateKey = toLocalDateKey(date);
+    const hasSessions = Boolean(sessionsByDateKey[dateKey]?.length);
+    calendarCells.push({ kind: "day", day, dateKey, hasSessions });
+  }
+
+  while (calendarCells.length % 7 !== 0) {
+    calendarCells.push({ kind: "empty" });
+  }
+
+  const sessionsCountInCurrentMonth = Object.entries(sessionsByDateKey).filter(([dateKey]) => {
+    const [yearRaw, monthRaw] = dateKey.split("-");
+    return Number(yearRaw) === currentMonthStart.getFullYear() && Number(monthRaw) === currentMonthStart.getMonth() + 1;
+  }).length;
+
+  const selectedDaySessions = selectedCalendarDateKey ? sessionsByDateKey[selectedCalendarDateKey] ?? [] : [];
+  const selectedDateReadable = selectedCalendarDateKey ? formatDateKeyReadable(selectedCalendarDateKey) : "";
 
   const activeModuleLessons = activeModule
     ? moduleLessons.filter((lesson) => lesson.module_id === activeModule.id).sort((a, b) => a.order_index - b.order_index)
@@ -997,6 +1071,67 @@ export default function StatsPage() {
           </div>
 
           <div className="section-block">
+            <h3 className="subsection-title">Calendrier coaching</h3>
+            <div className="card">
+              <p className="card-meta" style={{ marginBottom: 10, textTransform: "capitalize" }}>
+                {currentMonthLabel}
+              </p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
+                {weekdayLabels.map((label) => (
+                  <p key={label} className="card-meta" style={{ margin: 0, textAlign: "center", fontSize: "0.78rem" }}>
+                    {label}
+                  </p>
+                ))}
+
+                {calendarCells.map((cell, index) => {
+                  if (cell.kind === "empty") {
+                    return <div key={`empty-${index}`} style={{ minHeight: 34 }} />;
+                  }
+
+                  const isToday =
+                    cell.day === nowDate.getDate() &&
+                    currentMonthStart.getMonth() === nowDate.getMonth() &&
+                    currentMonthStart.getFullYear() === nowDate.getFullYear();
+                  const isSelected = selectedCalendarDateKey === cell.dateKey;
+
+                  return (
+                    <button
+                      key={cell.dateKey}
+                      type="button"
+                      onClick={() => {
+                        if (!cell.hasSessions) {
+                          return;
+                        }
+                        setSelectedCalendarDateKey(cell.dateKey);
+                      }}
+                      disabled={!cell.hasSessions}
+                      aria-label={cell.hasSessions ? `Voir les séances du ${cell.day}` : `Aucune séance le ${cell.day}`}
+                      style={{
+                        minHeight: 34,
+                        borderRadius: 8,
+                        border: `1px solid ${isSelected ? "#111827" : cell.hasSessions ? "#94a3b8" : "#e5e7eb"}`,
+                        background: isSelected ? "#111827" : cell.hasSessions ? "#f8fafc" : "#ffffff",
+                        color: isSelected ? "#ffffff" : "#111827",
+                        cursor: cell.hasSessions ? "pointer" : "default",
+                        fontWeight: isToday ? 700 : 500,
+                      }}
+                    >
+                      {cell.day}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {sessionsCountInCurrentMonth === 0 && (
+                <p className="card-meta" style={{ marginTop: 10 }}>
+                  Aucune séance prévue ce mois-ci.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="section-block">
             <h3 className="subsection-title">Mes tâches</h3>
             <TasksWidget />
           </div>
@@ -1237,6 +1372,50 @@ export default function StatsPage() {
                   </>
                 )}
               </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {selectedCalendarDateKey && (
+        <div className="modal-backdrop" onClick={() => setSelectedCalendarDateKey(null)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()} style={{ width: "min(720px, 100%)", maxHeight: "85vh" }}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Séances du {selectedDateReadable}</h3>
+              </div>
+              <button type="button" className="btn" onClick={() => setSelectedCalendarDateKey(null)}>
+                Fermer
+              </button>
+            </div>
+
+            {selectedDaySessions.length === 0 && <div className="empty-state">Aucune séance ce jour.</div>}
+
+            {selectedDaySessions.length > 0 && (
+              <div style={{ display: "grid", gap: 8 }}>
+                {selectedDaySessions.map((session) => {
+                  const hourLabel = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(
+                    new Date(parseDate(session.scheduled_at) ?? Date.now())
+                  );
+                  const statusLabel = session.status?.toLowerCase() === "completed" ? "completed" : "planned";
+                  const canReplan = statusLabel === "planned" && isValidHttpUrl(session.booking_url);
+
+                  return (
+                    <article key={session.id} className="card">
+                      <p className="card-meta">
+                        {hourLabel} · {statusLabel}
+                      </p>
+                      <h4 className="card-title">{session.theme ?? "Séance sans thème"}</h4>
+
+                      {canReplan && (
+                        <a href={session.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                          Replanifier
+                        </a>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
