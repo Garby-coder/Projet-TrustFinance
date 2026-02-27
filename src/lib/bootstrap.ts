@@ -36,6 +36,29 @@ const DEFAULT_TASKS = [
   { title: "Réserver le 1er appel de coaching", priority: "high", est_minutes: 2, status: "todo" },
 ];
 
+async function ensureUserEngagementRow(userId: string) {
+  const { data, error } = await supabase.from("user_engagement").select("user_id").eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+
+  if (!data) {
+    const { error: insertError } = await supabase.from("user_engagement").insert({
+      user_id: userId,
+      onboarding_done: false,
+      cadence_unit: "week",
+      cadence_target: 1,
+      xp: 0,
+      streak_current: 0,
+      streak_best: 0,
+      period_progress: 0,
+      last_period_key: null,
+    });
+
+    if (insertError && insertError.code !== "23505") {
+      throw insertError;
+    }
+  }
+}
+
 export async function ensureDefaultsForUser(userId: string) {
   // 1) Sessions : si aucune session pour cet utilisateur -> créer le pack
   const { count: sessionsCount, error: sessionsCountErr } = await supabase
@@ -110,4 +133,7 @@ export async function ensureDefaultsForUser(userId: string) {
     );
     if (error) throw error;
   }
+
+  // 3) Engagement utilisateur : créer la ligne si elle n'existe pas
+  await ensureUserEngagementRow(userId);
 }

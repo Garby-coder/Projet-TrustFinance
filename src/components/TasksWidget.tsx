@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { registerEngagementAction } from "../lib/engagement";
 
 type TaskItem = {
   id: string;
@@ -202,9 +203,32 @@ export default function TasksWidget() {
       return a.title.localeCompare(b.title, "fr");
     });
 
+  async function registerTaskDoneEngagement(taskId: string) {
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        throw error;
+      }
+
+      const userId = data.user?.id;
+      if (!userId) {
+        return;
+      }
+
+      await registerEngagementAction({
+        userId,
+        eventKey: `task_done:${taskId}`,
+        xpGain: 15,
+      });
+    } catch (err) {
+      console.error("Engagement indisponible après validation de tâche:", err);
+    }
+  }
+
   async function updateTaskStatus(task: TaskItem, checked: boolean) {
     const previousStatus = task.status ?? "todo";
     const nextStatus = checked ? "done" : "todo";
+    const movedToDone = previousStatus.toLowerCase() !== "done" && nextStatus === "done";
 
     if (previousStatus.toLowerCase() === nextStatus) {
       return;
@@ -219,6 +243,8 @@ export default function TasksWidget() {
     if (error) {
       setTasks((current) => current.map((item) => (item.id === task.id ? { ...item, status: previousStatus } : item)));
       setUpdateError("Impossible de mettre à jour la tâche pour le moment.");
+    } else if (movedToDone) {
+      void registerTaskDoneEngagement(task.id);
     }
 
     setUpdatingTaskIds((current) => current.filter((id) => id !== task.id));
