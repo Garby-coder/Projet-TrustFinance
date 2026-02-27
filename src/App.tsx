@@ -6,9 +6,7 @@ import ProtectedLayout from "./components/ProtectedLayout";
 import { supabase } from "./lib/supabase";
 import { ensureDefaultsForUser } from "./lib/bootstrap";
 
-import FormationPage from "./pages/FormationPage";
 import Login from "./pages/Login";
-import SeancesPage from "./pages/SeancesPage";
 import StatsPage from "./pages/StatsPage";
 
 type UserEngagement = {
@@ -302,16 +300,15 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={isAuthed ? <Navigate to="/formation" replace /> : <Login />} />
+        <Route path="/login" element={isAuthed ? <Navigate to="/" replace /> : <Login />} />
 
         <Route path="/" element={isAuthed ? <ProtectedLayout /> : <Navigate to="/login" replace />}>
-          <Route index element={<Navigate to="/formation" replace />} />
-          <Route path="seances" element={<SeancesPage />} />
-          <Route path="formation" element={<FormationPage />} />
-          <Route path="stats" element={<StatsPage />} />
+          <Route index element={<StatsPage />} />
+          <Route path="seances" element={<Navigate to="/" replace />} />
+          <Route path="formation" element={<Navigate to="/" replace />} />
         </Route>
 
-        <Route path="*" element={<Navigate to={isAuthed ? "/formation" : "/login"} replace />} />
+        <Route path="*" element={<Navigate to={isAuthed ? "/" : "/login"} replace />} />
       </Routes>
 
       {isAuthed && onboardingLoading && !showOnboardingModal && <p className="muted">Chargement de ton rythme...</p>}
