@@ -72,43 +72,6 @@ function isMissingLessonProgressTable(error: { code?: string; message: string })
   return error.code === "42P01" || (message.includes("does not exist") && message.includes("lesson_progress"));
 }
 
-function isMissingColumnError(error: { code?: string; message: string }) {
-  const message = error.message.toLowerCase();
-  return error.code === "42703" || (message.includes("column") && message.includes("does not exist"));
-}
-
-async function upsertLessonProgress(userId: string, lessonId: string) {
-  const nowIso = new Date().toISOString();
-  const payloads: Array<Record<string, string | boolean>> = [
-    { user_id: userId, lesson_id: lessonId, is_done: true, completed_at: nowIso, updated_at: nowIso },
-    { user_id: userId, lesson_id: lessonId, done: true, completed_at: nowIso, updated_at: nowIso },
-    { user_id: userId, lesson_id: lessonId, completed: true, completed_at: nowIso, updated_at: nowIso },
-    { user_id: userId, lesson_id: lessonId, status: "done", completed_at: nowIso, updated_at: nowIso },
-    { user_id: userId, lesson_id: lessonId, completed_at: nowIso, updated_at: nowIso },
-    { user_id: userId, lesson_id: lessonId },
-  ];
-
-  let lastColumnError: { code?: string; message: string } | null = null;
-
-  for (const payload of payloads) {
-    const { error } = await supabase.from("lesson_progress").upsert(payload, { onConflict: "user_id,lesson_id" });
-    if (!error) {
-      return;
-    }
-
-    if (isMissingColumnError(error)) {
-      lastColumnError = error;
-      continue;
-    }
-
-    throw error;
-  }
-
-  if (lastColumnError) {
-    throw lastColumnError;
-  }
-}
-
 function getLessonTypeLabel(contentType: string | null) {
   return contentType?.toLowerCase() === "video" ? "Vidéo" : "Lecture";
 }
@@ -594,8 +557,24 @@ export default function FormationPage() {
     setLessonProgressSubmittingId(lessonId);
 
     try {
-      await upsertLessonProgress(currentUserId, lessonId);
+      const nowIso = new Date().toISOString();
+      const { error: lessonProgressError } = await supabase.from("lesson_progress").upsert(
+        {
+          user_id: currentUserId,
+          lesson_id: lessonId,
+          status: "done",
+          done_at: nowIso,
+        },
+        { onConflict: "user_id,lesson_id" }
+      );
+
+      if (lessonProgressError) {
+        setLessonProgressMessage(`Impossible d'enregistrer la progression de la leçon : ${lessonProgressError.message}`);
+        return;
+      }
+
       setCompletedByLessonId((current) => ({ ...current, [lessonId]: true }));
+      setLessonProgressMessage("Leçon terminée.");
 
       void (async () => {
         try {
@@ -613,12 +592,8 @@ export default function FormationPage() {
         }
       })();
     } catch (progressError) {
-      const err = progressError as { code?: string; message?: string };
-      if (err.message && isMissingLessonProgressTable({ code: err.code, message: err.message })) {
-        setLessonProgressMessage("Progression des leçons indisponible.");
-      } else {
-        setLessonProgressMessage("Impossible d'enregistrer la progression de la leçon.");
-      }
+      const err = progressError as { message?: string };
+      setLessonProgressMessage(`Impossible d'enregistrer la progression de la leçon : ${err.message ?? "Erreur inconnue."}`);
     } finally {
       setLessonProgressSubmittingId((current) => (current === lessonId ? null : current));
     }
@@ -894,8 +869,11 @@ export default function FormationPage() {
                                 : "Marquer comme terminée"}
                           </button>
 
-                          {lessonProgressMessage && !isActiveLessonCompleted && (
-                            <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
+                          {lessonProgressMessage && (
+                            <p
+                              className="card-meta"
+                              style={{ marginTop: 8, color: lessonProgressMessage === "Leçon terminée." ? "#166534" : "#991b1b" }}
+                            >
                               {lessonProgressMessage}
                             </p>
                           )}
