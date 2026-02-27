@@ -34,6 +34,16 @@ type SessionItem = {
   scheduled_at: string | null;
 };
 
+type TaskItem = {
+  id: string;
+  title: string;
+  priority: string | null;
+  due_date: string | null;
+  est_minutes: number | null;
+  status: string | null;
+  updated_at?: string | null;
+};
+
 type QuizQuestionRow = {
   id: string;
   order_index: number;
@@ -66,6 +76,21 @@ function parseDate(dateValue: string | null | undefined) {
   return timestamp;
 }
 
+function formatDueDate(dueDate: string | null) {
+  if (!dueDate) {
+    return "Sans échéance";
+  }
+
+  const timestamp = Date.parse(dueDate);
+  if (Number.isNaN(timestamp)) {
+    return "Sans échéance";
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "medium",
+  }).format(new Date(timestamp));
+}
+
 function formatDate(dateValue: string | null | undefined) {
   const timestamp = parseDate(dateValue);
   if (timestamp === null) {
@@ -76,6 +101,60 @@ function formatDate(dateValue: string | null | undefined) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(timestamp));
+}
+
+function isDoneTask(task: TaskItem) {
+  return task.status?.toLowerCase() === "done";
+}
+
+function getPriorityLabel(priority: string | null) {
+  const normalized = priority?.toLowerCase();
+
+  if (normalized === "high") {
+    return "Priorité haute";
+  }
+  if (normalized === "medium") {
+    return "Priorité moyenne";
+  }
+  if (normalized === "low") {
+    return "Priorité basse";
+  }
+
+  return "Priorité non définie";
+}
+
+function compareDueDateAscNullsLast(aDate: string | null, bDate: string | null) {
+  const a = parseDate(aDate);
+  const b = parseDate(bDate);
+
+  if (a === null && b === null) {
+    return 0;
+  }
+  if (a === null) {
+    return 1;
+  }
+  if (b === null) {
+    return -1;
+  }
+
+  return a - b;
+}
+
+function compareDueDateDescNullsLast(aDate: string | null, bDate: string | null) {
+  const a = parseDate(aDate);
+  const b = parseDate(bDate);
+
+  if (a === null && b === null) {
+    return 0;
+  }
+  if (a === null) {
+    return 1;
+  }
+  if (b === null) {
+    return -1;
+  }
+
+  return b - a;
 }
 
 function toLocalDateKey(date: Date) {
@@ -123,6 +202,16 @@ function isMissingLessonProgressTable(error: { code?: string; message: string })
 function isMissingSessionsTable(error: { code?: string; message: string }) {
   const message = error.message.toLowerCase();
   return error.code === "42P01" || (message.includes("does not exist") && message.includes("sessions"));
+}
+
+function isMissingTasksTable(error: { code?: string; message: string }) {
+  const message = error.message.toLowerCase();
+  return error.code === "42P01" || (message.includes("does not exist") && message.includes("tasks"));
+}
+
+function isMissingUserEngagementTable(error: { code?: string; message: string }) {
+  const message = error.message.toLowerCase();
+  return error.code === "42P01" || (message.includes("does not exist") && message.includes("user_engagement"));
 }
 
 function isOrderIndexMissingColumnError(errorMessage: string) {
@@ -213,9 +302,13 @@ export default function StatsPage() {
   const [modules, setModules] = useState<ModuleItem[]>([]);
   const [moduleLessons, setModuleLessons] = useState<ModuleLesson[]>([]);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [streakCurrent, setStreakCurrent] = useState(0);
 
   const [formationError, setFormationError] = useState("");
   const [sessionsLoadError, setSessionsLoadError] = useState("");
+  const [tasksLoadError, setTasksLoadError] = useState("");
+  const [badgeLoadError, setBadgeLoadError] = useState("");
   const [quizDataError, setQuizDataError] = useState("");
 
   const [completedByLessonId, setCompletedByLessonId] = useState<Record<string, boolean>>({});
@@ -240,6 +333,11 @@ export default function StatsPage() {
   const [quizSubmitting, setQuizSubmitting] = useState(false);
   const [loadedQuizModuleId, setLoadedQuizModuleId] = useState<string | null>(null);
   const [selectedCalendarDateKey, setSelectedCalendarDateKey] = useState<string | null>(null);
+  const [showAllSessionsModal, setShowAllSessionsModal] = useState(false);
+  const [sessionsModalTab, setSessionsModalTab] = useState<"upcoming" | "past">("upcoming");
+  const [showAllTasksModal, setShowAllTasksModal] = useState(false);
+  const [tasksModalTab, setTasksModalTab] = useState<"todo" | "done">("todo");
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -249,6 +347,8 @@ export default function StatsPage() {
       setError("");
       setFormationError("");
       setSessionsLoadError("");
+      setTasksLoadError("");
+      setBadgeLoadError("");
       setQuizDataError("");
 
       const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -264,6 +364,25 @@ export default function StatsPage() {
         setError("Impossible d'identifier l'utilisateur.");
         setLoading(false);
         return;
+      }
+
+      const { data: userEngagementRow, error: userEngagementError } = await supabase
+        .from("user_engagement")
+        .select("streak_current")
+        .eq("user_id", currentUserId)
+        .maybeSingle();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (userEngagementError) {
+        if (!isMissingUserEngagementTable(userEngagementError)) {
+          setBadgeLoadError(`Impossible de charger le badge actuel : ${userEngagementError.message}`);
+        }
+        setStreakCurrent(0);
+      } else {
+        setStreakCurrent(Number(userEngagementRow?.streak_current ?? 0));
       }
 
       const { data: modulesData, error: modulesError } = await supabase
@@ -420,6 +539,43 @@ export default function StatsPage() {
         setSessions(normalizedSessions);
       }
 
+      const tasksSelectWithUpdatedAt = "id,title,priority,due_date,est_minutes,status,updated_at";
+      const tasksSelectFallback = "id,title,priority,due_date,est_minutes,status";
+
+      let tasksData: TaskItem[] | null = null;
+      let tasksError: { code?: string; message: string } | null = null;
+
+      const tasksWithUpdatedAt = await supabase.from("tasks").select(tasksSelectWithUpdatedAt);
+      if (tasksWithUpdatedAt.error) {
+        if (tasksWithUpdatedAt.error.message.toLowerCase().includes("updated_at")) {
+          const fallbackTasks = await supabase.from("tasks").select(tasksSelectFallback);
+          tasksData = ((fallbackTasks.data ?? []) as TaskItem[]).map((task) => ({ ...task, updated_at: null }));
+          tasksError = fallbackTasks.error;
+        } else {
+          tasksError = tasksWithUpdatedAt.error;
+        }
+      } else {
+        tasksData = (tasksWithUpdatedAt.data ?? []) as TaskItem[];
+      }
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (tasksError) {
+        if (isMissingTasksTable(tasksError)) {
+          setTasksLoadError("La table des tâches est indisponible pour le moment.");
+        } else {
+          setTasksLoadError(`Impossible de charger les tâches : ${tasksError.message}`);
+        }
+      } else {
+        const normalizedTasks = ((tasksData ?? []) as TaskItem[]).map((task) => ({
+          ...task,
+          updated_at: task.updated_at ?? null,
+        }));
+        setTasks(normalizedTasks);
+      }
+
       setLoading(false);
     })();
 
@@ -485,7 +641,7 @@ export default function StatsPage() {
     .sort(sortBySessionOrder)[0] ?? null;
 
   const now = Date.now();
-  const upcomingSessions = sessions
+  const upcomingSessionsAll = sessions
     .filter((session) => {
       const scheduledAt = parseDate(session.scheduled_at);
       return session.status?.toLowerCase() === "planned" && scheduledAt !== null && scheduledAt >= now;
@@ -503,8 +659,147 @@ export default function StatsPage() {
         return -1;
       }
       return timeA - timeB;
+    });
+
+  const pastSessionsAll = [...sessions]
+    .filter((session) => {
+      const status = session.status?.toLowerCase();
+      const scheduledAt = parseDate(session.scheduled_at);
+      return status === "completed" || (scheduledAt !== null && scheduledAt < now);
     })
-    .slice(0, 3);
+    .sort((a, b) => {
+      const timeA = parseDate(a.scheduled_at);
+      const timeB = parseDate(b.scheduled_at);
+
+      if (timeA !== null && timeB !== null && timeA !== timeB) {
+        return timeB - timeA;
+      }
+      if (timeA === null && timeB !== null) {
+        return 1;
+      }
+      if (timeA !== null && timeB === null) {
+        return -1;
+      }
+
+      return sortBySessionOrder(a, b);
+    });
+
+  const upcomingSessions = upcomingSessionsAll.slice(0, 3);
+
+  const todoTasks = tasks
+    .filter((task) => !isDoneTask(task))
+    .sort((a, b) => {
+      const dueDateDiff = compareDueDateAscNullsLast(a.due_date, b.due_date);
+      if (dueDateDiff !== 0) {
+        return dueDateDiff;
+      }
+      return a.title.localeCompare(b.title, "fr");
+    });
+
+  const doneTasks = tasks
+    .filter((task) => isDoneTask(task))
+    .sort((a, b) => {
+      const updatedA = parseDate(a.updated_at);
+      const updatedB = parseDate(b.updated_at);
+
+      if (updatedA !== null || updatedB !== null) {
+        if (updatedA === null && updatedB !== null) {
+          return 1;
+        }
+        if (updatedA !== null && updatedB === null) {
+          return -1;
+        }
+        if (updatedA !== null && updatedB !== null && updatedA !== updatedB) {
+          return updatedB - updatedA;
+        }
+      }
+
+      const dueDateDiff = compareDueDateDescNullsLast(a.due_date, b.due_date);
+      if (dueDateDiff !== 0) {
+        return dueDateDiff;
+      }
+
+      return a.title.localeCompare(b.title, "fr");
+    });
+
+  const lessonsDoneCount = Object.keys(completedByLessonId).length;
+  const quizPassedCount = Object.values(passedByModuleId).filter((value) => value === true).length;
+  const coachingScheduledCount = sessions.filter((session) => parseDate(session.scheduled_at) !== null).length;
+  const coachingCompletedCount = sessions.filter((session) => session.status?.toLowerCase() === "completed").length;
+
+  const badges = [
+    {
+      id: "parcours_lance",
+      name: "Parcours lancé",
+      conditionText: "Terminer 5 leçons",
+      unlocked: lessonsDoneCount >= 5,
+      reachedText: `${lessonsDoneCount} leçon${lessonsDoneCount > 1 ? "s" : ""} terminée${lessonsDoneCount > 1 ? "s" : ""}`,
+    },
+    {
+      id: "module_valide_i",
+      name: "Module validé I",
+      conditionText: "Valider 1 quiz",
+      unlocked: quizPassedCount >= 1,
+      reachedText: `${quizPassedCount} quiz réussi${quizPassedCount > 1 ? "s" : ""}`,
+    },
+    {
+      id: "module_valide_ii",
+      name: "Module validé II",
+      conditionText: "Valider 3 quiz",
+      unlocked: quizPassedCount >= 3,
+      reachedText: `${quizPassedCount} quiz réussi${quizPassedCount > 1 ? "s" : ""}`,
+    },
+    {
+      id: "module_valide_iii",
+      name: "Module validé III",
+      conditionText: "Valider 5 quiz",
+      unlocked: quizPassedCount >= 5,
+      reachedText: `${quizPassedCount} quiz réussi${quizPassedCount > 1 ? "s" : ""}`,
+    },
+    {
+      id: "coaching_confirme",
+      name: "Coaching confirmé",
+      conditionText: "Confirmer 1 coaching",
+      unlocked: coachingScheduledCount >= 1,
+      reachedText: `${coachingScheduledCount} coaching planifié${coachingScheduledCount > 1 ? "s" : ""}`,
+    },
+    {
+      id: "coaching_complete",
+      name: "Coaching complété",
+      conditionText: "Compléter 1 coaching",
+      unlocked: coachingCompletedCount >= 1,
+      reachedText: `${coachingCompletedCount} coaching complété${coachingCompletedCount > 1 ? "s" : ""}`,
+    },
+    {
+      id: "regularite_i",
+      name: "Régularité I",
+      conditionText: "Atteindre une série de 2",
+      unlocked: streakCurrent >= 2,
+      reachedText: `Série actuelle : ${streakCurrent}`,
+    },
+    {
+      id: "regularite_ii",
+      name: "Régularité II",
+      conditionText: "Atteindre une série de 4",
+      unlocked: streakCurrent >= 4,
+      reachedText: `Série actuelle : ${streakCurrent}`,
+    },
+  ];
+
+  const currentBadge = (
+    [
+      "module_valide_iii",
+      "module_valide_ii",
+      "module_valide_i",
+      "coaching_complete",
+      "coaching_confirme",
+      "regularite_ii",
+      "regularite_i",
+      "parcours_lance",
+    ] as const
+  )
+    .map((badgeId) => badges.find((badge) => badge.id === badgeId))
+    .find((badge) => badge?.unlocked === true) ?? null;
 
   const sessionsByDateKey: Record<string, SessionItem[]> = {};
   for (const session of sessions) {
@@ -989,6 +1284,27 @@ export default function StatsPage() {
           </div>
 
           <div className="section-block" style={{ marginTop: 20 }}>
+            <button
+              type="button"
+              className="card-button"
+              onClick={() => setShowBadgesModal(true)}
+              aria-label="Voir tous mes badges"
+              style={{ width: "100%", textAlign: "left" }}
+            >
+              <p className="card-meta">Badge actuel</p>
+              <h3 className="card-title">{currentBadge ? currentBadge.name : "Aucun badge"}</h3>
+              <p className="card-text">
+                {currentBadge ? currentBadge.reachedText : "Commence par terminer une leçon."}
+              </p>
+            </button>
+            {badgeLoadError && (
+              <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
+                {badgeLoadError}
+              </p>
+            )}
+          </div>
+
+          <div className="section-block" style={{ marginTop: 20 }}>
             <h3 className="subsection-title">Que veux-tu faire maintenant ?</h3>
             <p className="section-subtitle" style={{ marginBottom: 12 }}>
               Actions rapides pour avancer.
@@ -1042,7 +1358,22 @@ export default function StatsPage() {
           </div>
 
           <div className="section-block">
-            <h3 className="subsection-title">Prochaines séances</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <h3 className="subsection-title" style={{ margin: 0 }}>
+                Prochaines séances
+              </h3>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setSessionsModalTab("upcoming");
+                  setShowAllSessionsModal(true);
+                }}
+                disabled={sessions.length === 0}
+              >
+                Voir toutes les séances
+              </button>
+            </div>
             {sessionsLoadError && <div className="error-box">{sessionsLoadError}</div>}
             {!sessionsLoadError && upcomingSessions.length === 0 && <div className="empty-state">Aucune séance à venir.</div>}
 
@@ -1132,7 +1463,23 @@ export default function StatsPage() {
           </div>
 
           <div className="section-block">
-            <h3 className="subsection-title">Mes tâches</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <h3 className="subsection-title" style={{ margin: 0 }}>
+                Mes tâches
+              </h3>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setTasksModalTab("todo");
+                  setShowAllTasksModal(true);
+                }}
+                disabled={tasks.length === 0}
+              >
+                Voir toutes les tâches
+              </button>
+            </div>
+            {tasksLoadError && <div className="error-box">{tasksLoadError}</div>}
             <TasksWidget />
           </div>
 
@@ -1176,6 +1523,161 @@ export default function StatsPage() {
             )}
           </div>
         </>
+      )}
+
+      {showBadgesModal && (
+        <div className="modal-backdrop" onClick={() => setShowBadgesModal(false)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Tous mes badges</h3>
+              </div>
+              <button type="button" className="btn" onClick={() => setShowBadgesModal(false)}>
+                Fermer
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, overflowY: "auto", maxHeight: "65vh" }}>
+              {badges.map((badge) => (
+                <article key={badge.id} className="card" style={badge.unlocked ? undefined : { opacity: 0.6 }}>
+                  <p className="card-meta">{badge.unlocked ? "Débloqué" : "À débloquer"}</p>
+                  <h4 className="card-title">{badge.name}</h4>
+                  <p className="card-text">{badge.conditionText}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAllSessionsModal && (
+        <div className="modal-backdrop" onClick={() => setShowAllSessionsModal(false)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()} style={{ width: "min(860px, 100%)", maxHeight: "85vh" }}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Toutes les séances</h3>
+              </div>
+              <button type="button" className="btn" onClick={() => setShowAllSessionsModal(false)}>
+                Fermer
+              </button>
+            </div>
+
+            <div role="tablist" aria-label="Filtre des séances" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setSessionsModalTab("upcoming")}
+                aria-pressed={sessionsModalTab === "upcoming"}
+                style={sessionsModalTab === "upcoming" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
+              >
+                À venir
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setSessionsModalTab("past")}
+                aria-pressed={sessionsModalTab === "past"}
+                style={sessionsModalTab === "past" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
+              >
+                Passées
+              </button>
+            </div>
+
+            {sessionsLoadError && <div className="error-box">{sessionsLoadError}</div>}
+
+            {!sessionsLoadError && (
+              <div style={{ display: "grid", gap: 8, overflowY: "auto", maxHeight: "65vh" }}>
+                {(sessionsModalTab === "upcoming" ? upcomingSessionsAll : pastSessionsAll).map((session) => {
+                  const formattedDate = formatDate(session.scheduled_at);
+                  const isCompleted = session.status?.toLowerCase() === "completed";
+                  const canReplan = !isCompleted && isValidHttpUrl(session.booking_url);
+
+                  return (
+                    <article key={session.id} className="card">
+                      <p className="card-meta">
+                        {formattedDate ?? "Date non planifiée"} · {isCompleted ? "Passée" : "À venir"}
+                      </p>
+                      <h4 className="card-title">{session.theme ?? "Séance sans thème"}</h4>
+                      <p className="card-text">{session.objective ?? "Objectif non renseigné."}</p>
+                      {canReplan && (
+                        <a href={session.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                          Replanifier
+                        </a>
+                      )}
+                    </article>
+                  );
+                })}
+
+                {(sessionsModalTab === "upcoming" ? upcomingSessionsAll : pastSessionsAll).length === 0 && (
+                  <div className="empty-state">
+                    {sessionsModalTab === "upcoming" ? "Aucune séance à venir." : "Aucune séance passée."}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showAllTasksModal && (
+        <div className="modal-backdrop" onClick={() => setShowAllTasksModal(false)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Toutes les tâches</h3>
+              </div>
+              <button type="button" className="btn" onClick={() => setShowAllTasksModal(false)}>
+                Fermer
+              </button>
+            </div>
+
+            <div role="tablist" aria-label="Filtre des tâches" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setTasksModalTab("todo")}
+                aria-pressed={tasksModalTab === "todo"}
+                style={tasksModalTab === "todo" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
+              >
+                À faire
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setTasksModalTab("done")}
+                aria-pressed={tasksModalTab === "done"}
+                style={tasksModalTab === "done" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
+              >
+                Terminées
+              </button>
+            </div>
+
+            {tasksLoadError && <div className="error-box">{tasksLoadError}</div>}
+
+            {!tasksLoadError && (
+              <div style={{ display: "grid", gap: 8, overflowY: "auto", maxHeight: "65vh" }}>
+                {(tasksModalTab === "todo" ? todoTasks : doneTasks).map((task) => (
+                  <article key={task.id} className="card">
+                    <p className="card-meta">
+                      Échéance: {formatDueDate(task.due_date)}
+                      {task.est_minutes ? ` · ${task.est_minutes} min` : ""}
+                    </p>
+                    <h4 className="card-title">{task.title}</h4>
+                    <p className="card-text">
+                      {tasksModalTab === "todo" ? getPriorityLabel(task.priority) : "Terminée"}
+                    </p>
+                  </article>
+                ))}
+
+                {(tasksModalTab === "todo" ? todoTasks : doneTasks).length === 0 && (
+                  <div className="empty-state">
+                    {tasksModalTab === "todo" ? "Aucune tâche à faire." : "Aucune tâche terminée."}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {activeModule && (
