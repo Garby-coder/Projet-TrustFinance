@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import TasksWidget from "../components/TasksWidget";
+import { registerEngagementAction } from "../lib/engagement";
 import { supabase } from "../lib/supabase";
 
 const CALENDLY_FREE_URL = "https://calendly.com/trustfinanceam/reserve-ton-appel-avec-matheo-aalberg-clone";
@@ -123,7 +124,31 @@ export default function SeancesPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [lockingEnabled, setLockingEnabled] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
+  const scanSignatureRef = useRef("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      const { data, error: userError } = await supabase.auth.getUser();
+      if (!isMounted) {
+        return;
+      }
+
+      if (userError) {
+        console.warn("Impossible de récupérer l'utilisateur pour l'engagement coachings.", userError);
+        return;
+      }
+
+      setUserId(data.user?.id ?? null);
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -176,6 +201,82 @@ export default function SeancesPage() {
   useEffect(() => {
     setShowRecording(false);
   }, [activeSession?.id]);
+
+  useEffect(() => {
+    if (!userId || sessions.length === 0) {
+      return;
+    }
+
+    const scanSignature = sessions
+      .map((session) => `${session.id}:${session.scheduled_at ?? ""}:${(session.status ?? "").toLowerCase()}`)
+      .sort((a, b) => a.localeCompare(b, "fr"))
+      .join("|");
+
+    if (scanSignatureRef.current === scanSignature) {
+      return;
+    }
+
+    scanSignatureRef.current = scanSignature;
+    let isCancelled = false;
+
+    (async () => {
+      const engagementCalls: Promise<void>[] = [];
+
+      for (const session of sessions) {
+        if (session.scheduled_at) {
+          engagementCalls.push(
+            (async () => {
+              try {
+                const result = await registerEngagementAction({
+                  userId,
+                  eventKey: `coaching_confirmed:${session.id}`,
+                  xpGain: 30,
+                });
+
+                if (!isCancelled && result.applied) {
+                  window.dispatchEvent(new CustomEvent("tf:engagement", { detail: result }));
+                }
+              } catch (engagementError) {
+                console.warn("Impossible d'attribuer les XP du coaching confirmé.", engagementError);
+              }
+            })()
+          );
+        }
+
+        if (session.status?.toLowerCase() === "completed") {
+          engagementCalls.push(
+            (async () => {
+              try {
+                const result = await registerEngagementAction({
+                  userId,
+                  eventKey: `coaching_completed:${session.id}`,
+                  xpGain: 80,
+                });
+
+                if (!isCancelled && result.applied) {
+                  window.dispatchEvent(new CustomEvent("tf:engagement", { detail: result }));
+                }
+              } catch (engagementError) {
+                console.warn("Impossible d'attribuer les XP de la séance complétée.", engagementError);
+              }
+            })()
+          );
+        }
+      }
+
+      if (engagementCalls.length === 0) {
+        return;
+      }
+
+      await Promise.allSettled(engagementCalls);
+    })().catch((engagementError) => {
+      console.warn("Erreur pendant le scan d'engagement des coachings.", engagementError);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userId, sessions]);
 
   const upcomingSessions = sessions
     .filter((session) => session.status?.toLowerCase() === "planned")
