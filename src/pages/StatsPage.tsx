@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { registerEngagementAction } from "../lib/engagement";
 import { supabase } from "../lib/supabase";
 
@@ -337,6 +337,16 @@ export default function StatsPage() {
   const [showAllTasksModal, setShowAllTasksModal] = useState(false);
   const [tasksModalTab, setTasksModalTab] = useState<"todo" | "done">("todo");
   const [showBadgesModal, setShowBadgesModal] = useState(false);
+  const moduleRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    const selectedModuleId = activeModule?.id;
+    if (!selectedModuleId) {
+      return;
+    }
+
+    moduleRefs.current[selectedModuleId]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeModule?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1310,82 +1320,94 @@ export default function StatsPage() {
                       modules.length > 0 &&
                       modulesSorted.map((module) => {
                         const isUnlocked = unlockedByModuleId[module.id] === true;
-                        const lessonCount = moduleLessons.filter((lesson) => lesson.module_id === module.id).length;
+                        const lessonsForModule = moduleLessons
+                          .filter((lesson) => lesson.module_id === module.id)
+                          .sort((a, b) => a.order_index - b.order_index);
+                        const lessonCount = lessonsForModule.length;
                         const isSelected = activeModule?.id === module.id;
+                        const moduleHasQuiz = quizRequiredByModuleId[module.id] === true;
 
                         return (
-                          <button
-                            key={module.id}
-                            type="button"
-                            className="card-button tf-card"
-                            onClick={() => openModule(module)}
-                            aria-label={`Ouvrir le module ${module.title}`}
-                            disabled={!isUnlocked}
-                            style={
-                              !isUnlocked
-                                ? { opacity: 0.7, cursor: "not-allowed" }
-                                : isSelected
-                                  ? { borderColor: "#AF8732" }
-                                  : undefined
-                            }
-                          >
-                            <p className="card-meta">Module {module.order_index}</p>
-                            <h4 className="card-title tf-title">{module.title}</h4>
-                            <p className="card-text clamp-2">{module.description ?? "Aucune description."}</p>
-                            <p className="card-meta" style={{ marginTop: 10 }}>
-                              {lessonCount} leçon(s)
-                            </p>
-                            {!isUnlocked && (
-                              <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
-                                Verrouillé — valide le quiz du module précédent
+                          <div key={module.id} ref={(element) => { moduleRefs.current[module.id] = element; }} className="tf-moduleCard">
+                            <button
+                              type="button"
+                              className="card-button tf-card"
+                              onClick={() => openModule(module)}
+                              aria-label={`Ouvrir le module ${module.title}`}
+                              disabled={!isUnlocked}
+                              style={
+                                !isUnlocked
+                                  ? { opacity: 0.7, cursor: "not-allowed" }
+                                  : isSelected
+                                    ? { borderColor: "#AF8732" }
+                                    : undefined
+                              }
+                            >
+                              <p className="card-meta">Module {module.order_index}</p>
+                              <h4 className="card-title tf-title">{module.title}</h4>
+                              <p className="card-text clamp-2">{module.description ?? "Aucune description."}</p>
+                              <p className="card-meta" style={{ marginTop: 10 }}>
+                                {lessonCount} leçon(s)
                               </p>
+                              {!isUnlocked && (
+                                <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
+                                  Verrouillé — valide le quiz du module précédent
+                                </p>
+                              )}
+                            </button>
+
+                            {isSelected && (
+                              <div className="tf-moduleExpand">
+                                <div className="tf-lessonTree">
+                                  {lessonsForModule.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
+
+                                  {lessonsForModule.map((lesson) => {
+                                    const isLessonSelected = activeLesson?.id === lesson.id;
+                                    const isCompleted = completedByLessonId[lesson.id] === true;
+
+                                    return (
+                                      <button
+                                        key={lesson.id}
+                                        type="button"
+                                        className="tf-lessonRow"
+                                        onClick={() => {
+                                          setActiveTab("lessons");
+                                          setActiveLessonId(lesson.id);
+                                        }}
+                                        style={isLessonSelected ? { borderColor: "#AF8732" } : undefined}
+                                        aria-label={`Ouvrir la leçon ${lesson.title}`}
+                                      >
+                                        <div className="tf-cardHeader" style={{ alignItems: "center" }}>
+                                          <div>
+                                            <h4 className="card-title tf-title">{lesson.title}</h4>
+                                            <p className="card-meta">
+                                              {getLessonTypeLabel(lesson.content_type)}
+                                              {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
+                                            </p>
+                                          </div>
+                                          <span className={isCompleted ? "tf-chip tf-chip--accent" : "tf-chip"}>
+                                            {isCompleted ? "OK" : "•"}
+                                          </span>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+
+                                  {moduleHasQuiz && (
+                                    <button
+                                      type="button"
+                                      className="tf-quizRow"
+                                      onClick={() => openModule(module, "quiz", null)}
+                                    >
+                                      Quiz {passedByModuleId[module.id] === true ? "validé" : "à faire"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             )}
-                          </button>
+                          </div>
                         );
                       })}
-
-                    {activeModule && (
-                      <div className="section-block tf-card tf-card--flat">
-                        <div className="tf-cardHeader">
-                          <h3 className="subsection-title tf-title">Leçons</h3>
-                          <span className="tf-chip">{activeModuleLessons.length}</span>
-                        </div>
-
-                        {activeModuleLessons.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
-
-                        {activeModuleLessons.length > 0 && (
-                          <div className="tf-paneGrid">
-                            {activeModuleLessons.map((lesson) => {
-                              const isSelected = activeLesson?.id === lesson.id;
-                              const isCompleted = completedByLessonId[lesson.id] === true;
-
-                              return (
-                                <button
-                                  key={lesson.id}
-                                  type="button"
-                                  className="card-button tf-card"
-                                  onClick={() => {
-                                    setActiveTab("lessons");
-                                    setActiveLessonId(lesson.id);
-                                  }}
-                                  style={isSelected ? { borderColor: "#AF8732" } : undefined}
-                                  aria-label={`Ouvrir la leçon ${lesson.title}`}
-                                >
-                                  <h4 className="card-title tf-title">{lesson.title}</h4>
-                                  <p className="card-meta">
-                                    {getLessonTypeLabel(lesson.content_type)}
-                                    {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
-                                  </p>
-                                  <p className="card-meta" style={{ marginTop: 8 }}>
-                                    {isCompleted ? "Terminée" : "À faire"}
-                                  </p>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
               </section>
@@ -1603,8 +1625,8 @@ export default function StatsPage() {
       )}
 
         {showBadgesModal && (
-        <div className="modal-backdrop" onClick={() => setShowBadgesModal(false)}>
-          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowBadgesModal(false)}>
+          <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
               <div>
                 <h3 className="modal-title tf-title">Tous mes badges</h3>
@@ -1628,8 +1650,8 @@ export default function StatsPage() {
       )}
 
         {showAllSessionsModal && (
-        <div className="modal-backdrop" onClick={() => setShowAllSessionsModal(false)}>
-          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(860px, 100%)", maxHeight: "85vh" }}>
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowAllSessionsModal(false)}>
+          <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(860px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
               <div>
                 <h3 className="modal-title tf-title">Toutes les séances</h3>
@@ -1697,8 +1719,8 @@ export default function StatsPage() {
       )}
 
         {showAllTasksModal && (
-        <div className="modal-backdrop" onClick={() => setShowAllTasksModal(false)}>
-          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowAllTasksModal(false)}>
+          <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
               <div>
                 <h3 className="modal-title tf-title">Toutes les tâches</h3>
@@ -1758,8 +1780,8 @@ export default function StatsPage() {
       )}
 
       {selectedCalendarDateKey && (
-        <div className="modal-backdrop" onClick={() => setSelectedCalendarDateKey(null)}>
-          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(720px, 100%)", maxHeight: "85vh" }}>
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setSelectedCalendarDateKey(null)}>
+          <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(720px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
               <div>
                 <h3 className="modal-title tf-title">Séances du {selectedDateReadable}</h3>

@@ -205,6 +205,66 @@
   gap: 12px;
 }
 
+.tf-moduleCard {
+  display: grid;
+  gap: 0;
+}
+
+.tf-moduleExpand {
+  margin-top: 10px;
+  padding-left: 14px;
+}
+
+.tf-lessonTree {
+  position: relative;
+  padding-left: 16px;
+}
+
+.tf-lessonTree:before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  bottom: 10px;
+  width: 2px;
+  background: rgba(175, 135, 50, 0.35);
+  border-radius: 999px;
+}
+
+.tf-lessonRow {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: var(--radiusSm);
+  border: 1px solid var(--border2);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  text-align: left;
+}
+
+.tf-lessonRow:before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 16px;
+  height: 2px;
+  background: rgba(175, 135, 50, 0.35);
+  transform: translateY(-50%);
+}
+
+.tf-quizRow {
+  margin-top: 12px;
+  width: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 122, 24, 0.35);
+  background: rgba(255, 122, 24, 0.18);
+  padding: 12px 14px;
+  color: var(--text);
+}
+
 .tf-app .section-title,
 .tf-app .subsection-title,
 .tf-app .modal-title,
@@ -343,12 +403,23 @@
   z-index: 50;
 }
 
+.tf-app .tf-modalBackdrop {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+}
+
 .tf-app .modal-panel {
   width: min(860px, 100%);
   max-height: 90vh;
   overflow: auto;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
   box-shadow: var(--shadow);
+}
+
+.tf-app .tf-modalPanel {
+  background: rgba(17, 17, 17, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
 }
 
 .tf-app .modal-header {

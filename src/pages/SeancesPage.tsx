@@ -427,8 +427,8 @@ export default function SeancesPage() {
       )}
 
       {activeSession && (
-        <div className="modal-backdrop" onClick={closeActiveSessionModal}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-backdrop tf-modalBackdrop" onClick={closeActiveSessionModal}>
+          <div className="modal-panel tf-modalPanel" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h3 className="modal-title">{activeSession.theme ?? "Séance sans thème"}</h3>

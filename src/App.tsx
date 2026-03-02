@@ -319,8 +319,8 @@ export default function App() {
         {isAuthed && onboardingError && !showOnboardingModal && <div className="error-box">{onboardingError}</div>}
 
         {isAuthed && showOnboardingModal && (
-          <div className="modal-backdrop">
-            <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="global-cadence-onboarding-title">
+          <div className="modal-backdrop tf-modalBackdrop">
+            <div className="modal-panel tf-modalPanel" role="dialog" aria-modal="true" aria-labelledby="global-cadence-onboarding-title">
               <div className="modal-header">
                 <div>
                   <h3 id="global-cadence-onboarding-title" className="modal-title">

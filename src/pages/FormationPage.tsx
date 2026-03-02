@@ -753,8 +753,8 @@ export default function FormationPage() {
       )}
 
       {mode === "modules" && activeModule && (
-        <div className="modal-backdrop" onClick={closeModuleModal}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-backdrop tf-modalBackdrop" onClick={closeModuleModal}>
+          <div className="modal-panel tf-modalPanel" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <p className="card-meta">Module</p>
@@ -956,8 +956,8 @@ export default function FormationPage() {
       )}
 
       {mode === "fallback" && activeFallbackLesson && (
-        <div className="modal-backdrop" onClick={() => setActiveFallbackLesson(null)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setActiveFallbackLesson(null)}>
+          <div className="modal-panel tf-modalPanel" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <p className="card-meta">{activeFallbackLesson.module ?? "Module"}</p>
