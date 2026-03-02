@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import TasksWidget from "../components/TasksWidget";
 import { registerEngagementAction } from "../lib/engagement";
 import { supabase } from "../lib/supabase";
 
@@ -636,10 +635,6 @@ export default function StatsPage() {
     return null;
   })();
 
-  const nextCoachingSession = [...sessions]
-    .filter((session) => session.status?.toLowerCase() !== "completed")
-    .sort(sortBySessionOrder)[0] ?? null;
-
   const now = Date.now();
   const upcomingSessionsAll = sessions
     .filter((session) => {
@@ -683,8 +678,6 @@ export default function StatsPage() {
 
       return sortBySessionOrder(a, b);
     });
-
-  const upcomingSessions = upcomingSessionsAll.slice(0, 3);
 
   const todoTasks = tasks
     .filter((task) => !isDoneTask(task))
@@ -824,27 +817,6 @@ export default function StatsPage() {
 
   const nowDate = new Date();
   const currentMonthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1);
-  const currentMonthLabel = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(currentMonthStart);
-  const firstWeekdayOffset = (currentMonthStart.getDay() + 6) % 7;
-  const daysInCurrentMonth = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() + 1, 0).getDate();
-  const weekdayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-
-  const calendarCells: Array<{ kind: "empty" } | { kind: "day"; day: number; dateKey: string; hasSessions: boolean }> = [];
-
-  for (let index = 0; index < firstWeekdayOffset; index += 1) {
-    calendarCells.push({ kind: "empty" });
-  }
-
-  for (let day = 1; day <= daysInCurrentMonth; day += 1) {
-    const date = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth(), day);
-    const dateKey = toLocalDateKey(date);
-    const hasSessions = Boolean(sessionsByDateKey[dateKey]?.length);
-    calendarCells.push({ kind: "day", day, dateKey, hasSessions });
-  }
-
-  while (calendarCells.length % 7 !== 0) {
-    calendarCells.push({ kind: "empty" });
-  }
 
   const sessionsCountInCurrentMonth = Object.entries(sessionsByDateKey).filter(([dateKey]) => {
     const [yearRaw, monthRaw] = dateKey.split("-");
@@ -872,13 +844,6 @@ export default function StatsPage() {
     setActiveLessonId(lessonId ?? lessons[0]?.id ?? null);
     setActiveTab(tab);
     setLoadedQuizModuleId(null);
-    setQuizSubmitMessage("");
-  }
-
-  function closeModuleModal() {
-    setActiveModule(null);
-    setActiveLessonId(null);
-    setActiveTab("lessons");
     setQuizSubmitMessage("");
   }
 
@@ -1244,36 +1209,43 @@ export default function StatsPage() {
 
       {!loading && (
         <section className="tf-dashboard">
-          <aside className="tf-sidebar">
+          <aside className="tf-sidebar tf-card tf-card--flat">
             <span className="tf-chip tf-chip--accent">TF</span>
-            <span className="tf-chip">01</span>
-            <span className="tf-chip">02</span>
-            <span className="tf-chip">03</span>
-            <span className="tf-chip">04</span>
+            <span className="tf-chip" aria-hidden="true">◻</span>
+            <span className="tf-chip" aria-hidden="true">◯</span>
+            <div style={{ marginTop: "auto" }}>
+              <span className="tf-chip">1</span>
+            </div>
           </aside>
 
           <main className="tf-dashboardMain">
             <div className="tf-topRow">
-              <section className="tf-card tf-card--flat tf-paneSection">
-                <p className="tf-chip tf-chip--accent">Académie</p>
-                <h2 className="section-title tf-title">Dashboard</h2>
-                <p className="section-subtitle tf-subtitle">Ton espace unique pour avancer sur ta formation et ton coaching.</p>
-                {badgeLoadError && (
-                  <p className="card-meta" style={{ color: "#991b1b" }}>
-                    {badgeLoadError}
-                  </p>
-                )}
-              </section>
+              <div className="tf-card tf-card--flat" style={{ padding: 14, display: "grid", gap: 10 }}>
+                <label className="tf-title" htmlFor="dashboard-academie-select">
+                  Académie
+                </label>
+                <select
+                  id="dashboard-academie-select"
+                  className="tf-btn"
+                  defaultValue="academie"
+                  style={{ width: "100%", appearance: "none" }}
+                >
+                  <option value="academie">Académie</option>
+                </select>
+                <p className="tf-subtitle" style={{ margin: 0 }}>
+                  Accompagnement
+                </p>
+              </div>
 
               <div className="tf-quickActions">
                 <button
                   type="button"
-                  className="card-button tf-card tf-quickCard tf-btn tf-btn--accent"
+                  className="card-button tf-card tf-quickCard tf-quickCard--accent"
                   onClick={handleOpenFormationAction}
                   disabled={!nextFormationAction}
                 >
                   <h4 className="tf-title">Start</h4>
-                  <p>{nextFormationAction ? "Reprendre la prochaine leçon" : "Aucune leçon à reprendre"}</p>
+                  <p>{nextFormationAction ? "Reprendre la prochaine leçon" : "Choisis un module"}</p>
                 </button>
                 <button
                   type="button"
@@ -1314,312 +1286,314 @@ export default function StatsPage() {
             </div>
 
             <div className="tf-contentRow">
-              <section className="tf-leftPane tf-card">
-                <div className="tf-cardHeader">
-                  <div>
-                    <h3 className="subsection-title tf-title">Vue rapide</h3>
-                    <p className="tf-subtitle">Modules, séances et badge actuel.</p>
-                  </div>
+              <section className="tf-leftPane tf-card" style={{ padding: 14 }}>
+                <div className="tf-cardHeader" style={{ alignItems: "center" }}>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <span className="tf-chip tf-chip--accent">Tous</span>
                     <span className="tf-chip">À faire</span>
                     <span className="tf-chip">Fait</span>
                   </div>
+                  {badgeLoadError && (
+                    <span className="card-meta" style={{ color: "#991b1b" }}>
+                      {badgeLoadError}
+                    </span>
+                  )}
                 </div>
+
+                {formationError && <div className="error-box">{formationError}</div>}
 
                 <div className="tf-scroll">
                   <div className="tf-paneStack">
-                    <div className="section-block tf-card tf-card--flat">
-                      <button
-                        type="button"
-                        className="card-button tf-card tf-card--flat"
-                        onClick={() => setShowBadgesModal(true)}
-                        aria-label="Voir tous mes badges"
-                        style={{ width: "100%", textAlign: "left" }}
-                      >
-                        <p className="card-meta tf-chip tf-chip--accent">Badge actuel</p>
-                        <h3 className="card-title tf-title">{currentBadge ? currentBadge.name : "Aucun badge"}</h3>
-                        <p className="card-text">{currentBadge ? currentBadge.reachedText : "Commence par terminer une leçon."}</p>
-                      </button>
-                    </div>
+                    {!formationError && modules.length === 0 && <div className="empty-state">Aucun module disponible.</div>}
 
-                    <div className="section-block tf-card tf-card--flat">
-                      <div className="tf-cardHeader" style={{ flexWrap: "wrap" }}>
-                        <h3 className="subsection-title tf-title" style={{ margin: 0 }}>
-                          Prochaines séances
-                        </h3>
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => {
-                            setSessionsModalTab("upcoming");
-                            setShowAllSessionsModal(true);
-                          }}
-                          disabled={sessions.length === 0}
-                        >
-                          Voir toutes
-                        </button>
-                      </div>
-                      {sessionsLoadError && <div className="error-box">{sessionsLoadError}</div>}
-                      {!sessionsLoadError && upcomingSessions.length === 0 && <div className="empty-state">Aucune séance à venir.</div>}
+                    {!formationError &&
+                      modules.length > 0 &&
+                      modulesSorted.map((module) => {
+                        const isUnlocked = unlockedByModuleId[module.id] === true;
+                        const lessonCount = moduleLessons.filter((lesson) => lesson.module_id === module.id).length;
+                        const isSelected = activeModule?.id === module.id;
 
-                      {!sessionsLoadError && upcomingSessions.length > 0 && (
-                        <div className="tf-paneGrid">
-                          {upcomingSessions.map((session) => {
-                            const formattedDate = formatDate(session.scheduled_at);
-                            return (
-                              <article key={session.id} className="card tf-card">
-                                {formattedDate && <p className="card-meta">{formattedDate}</p>}
-                                <h4 className="card-title tf-title">{session.theme ?? "Séance sans thème"}</h4>
-                                <p className="card-text clamp-2">{session.objective ?? "Objectif non renseigné."}</p>
-
-                                {isValidHttpUrl(session.booking_url) ? (
-                                  <a href={session.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
-                                    {parseDate(session.scheduled_at) !== null ? "Replanifier" : "Réserver"}
-                                  </a>
-                                ) : (
-                                  <p className="card-meta card-action">Lien de réservation non disponible</p>
-                                )}
-                              </article>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="section-block tf-card tf-card--flat">
-                      <h3 className="subsection-title tf-title">Calendrier coaching</h3>
-                      <div className="card tf-card">
-                        <p className="card-meta tf-chip tf-chip--accent" style={{ marginBottom: 10, textTransform: "capitalize" }}>
-                          {currentMonthLabel}
-                        </p>
-
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
-                          {weekdayLabels.map((label) => (
-                            <p key={label} className="card-meta" style={{ margin: 0, textAlign: "center", fontSize: "0.78rem" }}>
-                              {label}
-                            </p>
-                          ))}
-
-                          {calendarCells.map((cell, index) => {
-                            if (cell.kind === "empty") {
-                              return <div key={`empty-${index}`} style={{ minHeight: 34 }} />;
+                        return (
+                          <button
+                            key={module.id}
+                            type="button"
+                            className="card-button tf-card"
+                            onClick={() => openModule(module)}
+                            aria-label={`Ouvrir le module ${module.title}`}
+                            disabled={!isUnlocked}
+                            style={
+                              !isUnlocked
+                                ? { opacity: 0.7, cursor: "not-allowed" }
+                                : isSelected
+                                  ? { borderColor: "#AF8732" }
+                                  : undefined
                             }
+                          >
+                            <p className="card-meta">Module {module.order_index}</p>
+                            <h4 className="card-title tf-title">{module.title}</h4>
+                            <p className="card-text clamp-2">{module.description ?? "Aucune description."}</p>
+                            <p className="card-meta" style={{ marginTop: 10 }}>
+                              {lessonCount} leçon(s)
+                            </p>
+                            {!isUnlocked && (
+                              <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
+                                Verrouillé — valide le quiz du module précédent
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })}
 
-                            const isToday =
-                              cell.day === nowDate.getDate() &&
-                              currentMonthStart.getMonth() === nowDate.getMonth() &&
-                              currentMonthStart.getFullYear() === nowDate.getFullYear();
-                            const isSelected = selectedCalendarDateKey === cell.dateKey;
-
-                            return (
-                              <button
-                                key={cell.dateKey}
-                                type="button"
-                                onClick={() => {
-                                  if (!cell.hasSessions) {
-                                    return;
-                                  }
-                                  setSelectedCalendarDateKey(cell.dateKey);
-                                }}
-                                disabled={!cell.hasSessions}
-                                aria-label={cell.hasSessions ? `Voir les séances du ${cell.day}` : `Aucune séance le ${cell.day}`}
-                                style={{
-                                  minHeight: 34,
-                                  borderRadius: 8,
-                                  border: `1px solid ${isSelected ? "#111827" : cell.hasSessions ? "#94a3b8" : "#e5e7eb"}`,
-                                  background: isSelected ? "#111827" : cell.hasSessions ? "#f8fafc" : "#ffffff",
-                                  color: isSelected ? "#ffffff" : "#111827",
-                                  cursor: cell.hasSessions ? "pointer" : "default",
-                                  fontWeight: isToday ? 700 : 500,
-                                }}
-                              >
-                                {cell.day}
-                              </button>
-                            );
-                          })}
+                    {activeModule && (
+                      <div className="section-block tf-card tf-card--flat">
+                        <div className="tf-cardHeader">
+                          <h3 className="subsection-title tf-title">Leçons</h3>
+                          <span className="tf-chip">{activeModuleLessons.length}</span>
                         </div>
 
-                        {sessionsCountInCurrentMonth === 0 && (
-                          <p className="card-meta" style={{ marginTop: 10 }}>
-                            Aucune séance prévue ce mois-ci.
-                          </p>
+                        {activeModuleLessons.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
+
+                        {activeModuleLessons.length > 0 && (
+                          <div className="tf-paneGrid">
+                            {activeModuleLessons.map((lesson) => {
+                              const isSelected = activeLesson?.id === lesson.id;
+                              const isCompleted = completedByLessonId[lesson.id] === true;
+
+                              return (
+                                <button
+                                  key={lesson.id}
+                                  type="button"
+                                  className="card-button tf-card"
+                                  onClick={() => {
+                                    setActiveTab("lessons");
+                                    setActiveLessonId(lesson.id);
+                                  }}
+                                  style={isSelected ? { borderColor: "#AF8732" } : undefined}
+                                  aria-label={`Ouvrir la leçon ${lesson.title}`}
+                                >
+                                  <h4 className="card-title tf-title">{lesson.title}</h4>
+                                  <p className="card-meta">
+                                    {getLessonTypeLabel(lesson.content_type)}
+                                    {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
+                                  </p>
+                                  <p className="card-meta" style={{ marginTop: 8 }}>
+                                    {isCompleted ? "Terminée" : "À faire"}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </section>
 
-              <section className="tf-centerPane tf-card">
+              <section className="tf-centerPane tf-card" style={{ padding: 14 }}>
                 <div className="tf-cardHeader">
-                  <div>
-                    <h3 className="subsection-title tf-title">Parcours</h3>
-                    <p className="tf-subtitle">Leçons, quiz, tâches et coaching dans une seule vue.</p>
-                  </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button type="button" className="tf-chip tf-chip--accent" onClick={handleOpenFormationAction} disabled={!nextFormationAction}>
+                    <button
+                      type="button"
+                      className={activeTab === "lessons" ? "tf-chip tf-chip--accent" : "tf-chip"}
+                      onClick={() => setActiveTab("lessons")}
+                      disabled={!activeModule}
+                    >
                       Leçons
                     </button>
-                    <button type="button" className="tf-chip" onClick={handleOpenQuizAction} disabled={!nextQuizAction}>
+                    <button
+                      type="button"
+                      className={activeTab === "quiz" ? "tf-chip tf-chip--accent" : "tf-chip"}
+                      onClick={() => {
+                        if (activeModule) {
+                          setActiveTab("quiz");
+                        }
+                      }}
+                      disabled={!activeModule}
+                    >
                       Quiz
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => {
+                        setSessionsModalTab("upcoming");
+                        setShowAllSessionsModal(true);
+                      }}
+                    >
+                      Séances
+                    </button>
+                    <button type="button" className="btn" onClick={handleOpenQuizAction} disabled={!nextQuizAction}>
+                      Quiz suivant
                     </button>
                   </div>
                 </div>
 
+                {quizDataError && <div className="error-box">{quizDataError}</div>}
+
                 <div className="tf-scroll">
                   <div className="tf-paneStack">
-                    <div className="tf-paneGridTwo">
-                      <article className="card tf-card">
-                        <h3 className="card-title tf-title">Formation en cours</h3>
-                        <p className="card-text">
-                          {nextFormationAction
-                            ? `Leçon suivante : ${nextFormationAction.lesson.title} (Module ${nextFormationAction.module.title}).`
-                            : "Aucune leçon à reprendre pour le moment."}
-                        </p>
-                        <div className="card-action">
-                          <button type="button" className="btn btn-primary" onClick={handleOpenFormationAction} disabled={!nextFormationAction}>
-                            Reprendre la formation
-                          </button>
-                        </div>
-                      </article>
+                    {!activeModule && (
+                      <div className="empty-state">
+                        Choisis un module à gauche ou utilise Start pour ouvrir ta prochaine leçon.
+                      </div>
+                    )}
 
-                      <article className="card tf-card">
-                        <h3 className="card-title tf-title">Coaching personnel</h3>
-                        <p className="card-text">
-                          {nextCoachingSession
-                            ? `Séance débloquée : ${nextCoachingSession.theme ?? "Séance sans thème"}.`
-                            : "Aucun coaching prévu pour le moment."}
-                        </p>
-                        <div className="card-action">
-                          {nextCoachingSession && isValidHttpUrl(nextCoachingSession.booking_url) ? (
-                            <a href={nextCoachingSession.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary">
-                              Prendre un rendez-vous
-                            </a>
-                          ) : (
-                            <button type="button" className="btn" disabled>
-                              Prendre un rendez-vous
-                            </button>
+                    {activeModule && (
+                      <>
+                        <div className="tf-cardHeader">
+                          <div>
+                            <p className="card-meta tf-chip tf-chip--accent">Module</p>
+                            <h3 className="subsection-title tf-title">{activeModule.title}</h3>
+                            {activeModule.description && <p className="tf-subtitle">{activeModule.description}</p>}
+                          </div>
+                          {activeTab === "lessons" && activeLesson && (
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end" }}>
+                              <span className={isActiveLessonCompleted ? "tf-chip tf-chip--accent" : "tf-chip"}>
+                                {isActiveLessonCompleted ? "Terminée" : "À faire"}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => void markLessonAsCompleted(activeLesson.id)}
+                                disabled={isActiveLessonCompleted || lessonProgressSubmittingId === activeLesson.id}
+                              >
+                                {isActiveLessonCompleted
+                                  ? "Leçon terminée"
+                                  : lessonProgressSubmittingId === activeLesson.id
+                                    ? "Enregistrement..."
+                                    : "Marquer comme terminée"}
+                              </button>
+                            </div>
                           )}
                         </div>
-                      </article>
-                    </div>
 
-                    <div className="section-block tf-card">
-                      <h3 className="subsection-title tf-title">Que veux-tu faire maintenant ?</h3>
-                      <p className="section-subtitle tf-subtitle" style={{ marginBottom: 12 }}>
-                        Actions rapides pour avancer.
-                      </p>
+                        {!isActiveModuleUnlocked && <div className="empty-state">Verrouillé — valide le quiz du module précédent.</div>}
 
-                      {(formationError || sessionsLoadError || quizDataError) && (
-                        <div className="error-box">
-                          {formationError || sessionsLoadError || quizDataError}
-                        </div>
-                      )}
-
-                      <div className="card-grid">
-                        {nextFormationAction ? (
-                          <button type="button" className="card-button tf-card" onClick={handleOpenFormationAction}>
-                            <h4 className="card-title tf-title">Formation</h4>
-                            <p className="card-text">Leçon suivante : {nextFormationAction.lesson.title}</p>
-                          </button>
-                        ) : (
-                          <article className="card tf-card" style={{ opacity: 0.72 }}>
-                            <h4 className="card-title tf-title">Formation</h4>
-                            <p className="card-text">Aucune leçon à reprendre.</p>
-                          </article>
+                        {isActiveModuleUnlocked && activeTab === "lessons" && !activeLesson && (
+                          <div className="empty-state">Choisis une leçon dans la liste de gauche.</div>
                         )}
 
-                        {nextQuizAction ? (
-                          <button type="button" className="card-button tf-card" onClick={handleOpenQuizAction}>
-                            <h4 className="card-title tf-title">Quiz</h4>
-                            <p className="card-text">Quiz à valider : Module {nextQuizAction.title}</p>
-                          </button>
-                        ) : (
-                          <article className="card tf-card" style={{ opacity: 0.72 }}>
-                            <h4 className="card-title tf-title">Quiz</h4>
-                            <p className="card-text">Aucun quiz à valider.</p>
-                          </article>
-                        )}
-
-                        {nextCoachingSession && isValidHttpUrl(nextCoachingSession.booking_url) ? (
-                          <a href={nextCoachingSession.booking_url ?? "#"} target="_blank" rel="noreferrer" className="card-button tf-card">
-                            <h4 className="card-title tf-title">Coaching</h4>
-                            <p className="card-text">
-                              {parseDate(nextCoachingSession.scheduled_at) !== null ? "Séance à replanifier" : "Séance à réserver"} : {nextCoachingSession.theme ?? "Séance sans thème"}
-                            </p>
-                          </a>
-                        ) : (
-                          <article className="card tf-card" style={{ opacity: 0.72 }}>
-                            <h4 className="card-title tf-title">Coaching</h4>
-                            <p className="card-text">Aucun coaching prévu.</p>
-                          </article>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="section-block tf-card">
-                      <div className="tf-cardHeader" style={{ flexWrap: "wrap" }}>
-                        <h3 className="subsection-title tf-title" style={{ margin: 0 }}>
-                          Mes tâches
-                        </h3>
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => {
-                            setTasksModalTab("todo");
-                            setShowAllTasksModal(true);
-                          }}
-                          disabled={tasks.length === 0}
-                        >
-                          Voir toutes les tâches
-                        </button>
-                      </div>
-                      {tasksLoadError && <div className="error-box">{tasksLoadError}</div>}
-                      <div className="tf-scroll" style={{ maxHeight: 340 }}>
-                        <TasksWidget />
-                      </div>
-                    </div>
-
-                    <div className="section-block tf-card">
-                      <h3 className="subsection-title tf-title">Ma formation</h3>
-
-                      {formationError && <div className="error-box">{formationError}</div>}
-                      {!formationError && modules.length === 0 && <div className="empty-state">Aucun module disponible.</div>}
-
-                      {!formationError && modules.length > 0 && (
-                        <div className="card-grid tf-scroll" style={{ maxHeight: 520 }}>
-                          {modulesSorted.map((module) => {
-                            const isUnlocked = unlockedByModuleId[module.id] === true;
-                            const lessonCount = moduleLessons.filter((lesson) => lesson.module_id === module.id).length;
-
-                            return (
-                              <button
-                                key={module.id}
-                                type="button"
-                                className="card-button tf-card"
-                                onClick={() => openModule(module)}
-                                aria-label={`Ouvrir le module ${module.title}`}
-                                disabled={!isUnlocked}
-                                style={!isUnlocked ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
-                              >
-                                <p className="card-meta">Module {module.order_index}</p>
-                                <h4 className="card-title tf-title">{module.title}</h4>
-                                <p className="card-text clamp-2">{module.description ?? "Aucune description."}</p>
-                                <p className="card-meta" style={{ marginTop: 10 }}>
-                                  {lessonCount} leçon(s)
+                        {isActiveModuleUnlocked && activeTab === "lessons" && activeLesson && (
+                          <div className="tf-paneStack">
+                            <div className="tf-cardHeader">
+                              <div>
+                                <h4 className="subsection-title tf-title">{activeLesson.title}</h4>
+                                <p className="card-meta">
+                                  {getLessonTypeLabel(activeLesson.content_type)}
+                                  {activeLesson.duration_min ? ` · ${activeLesson.duration_min} min` : ""}
                                 </p>
-                                {!isUnlocked && (
-                                  <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
-                                    Verrouillé — valide le quiz du module précédent
+                              </div>
+                            </div>
+
+                            {lessonProgressMessage && (
+                              <p
+                                className="card-meta"
+                                style={{ color: lessonProgressMessage === "Leçon terminée." ? "#166534" : "#991b1b" }}
+                              >
+                                {lessonProgressMessage}
+                              </p>
+                            )}
+
+                            {activeLesson.content_type?.toLowerCase() === "video" && (
+                              <>
+                                {activeLesson.tella_url ? (
+                                  <div className="modal-video">
+                                    <iframe
+                                      src={activeLesson.tella_url}
+                                      title={activeLesson.title}
+                                      allow="autoplay; fullscreen; picture-in-picture"
+                                      allowFullScreen
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="empty-state">Vidéo indisponible pour cette leçon.</div>
+                                )}
+                              </>
+                            )}
+
+                            {activeLesson.content_type?.toLowerCase() === "lecture" && (
+                              <>
+                                {activeLesson.content_markdown ? (
+                                  <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
+                                    {activeLesson.content_markdown}
+                                  </p>
+                                ) : (
+                                  <div className="empty-state">Contenu de lecture indisponible pour cette leçon.</div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {isActiveModuleUnlocked && activeTab === "quiz" && (
+                          <>
+                            {quizLoading && <p className="muted">Chargement du quiz...</p>}
+                            {!quizLoading && quizError && <div className="error-box">Erreur Supabase: {quizError}</div>}
+                            {!quizLoading && !quizError && (quizUnavailable || quizQuestions.length === 0) && <div className="empty-state">Quiz non disponible.</div>}
+
+                            {!quizLoading && !quizError && !quizUnavailable && quizQuestions.length > 0 && (
+                              <div style={{ display: "grid", gap: 12 }}>
+                                {quizQuestions.map((question, questionIndex) => (
+                                  <div key={question.id} className="card tf-card">
+                                    <p className="card-meta">Question {questionIndex + 1}</p>
+                                    <p className="card-text">{question.prompt}</p>
+
+                                    <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                                      {(shuffledChoicesByQuestionId[question.id] ?? question.choices).map((choice) => (
+                                        <label key={choice.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                                          <input
+                                            type="radio"
+                                            name={`question-${question.id}`}
+                                            value={choice.id}
+                                            checked={selectedAnswers[question.id] === choice.id}
+                                            onChange={() => {
+                                              setSelectedAnswers((current) => ({ ...current, [question.id]: choice.id }));
+                                              if (quizSubmitMessage) {
+                                                setQuizSubmitMessage("");
+                                              }
+                                            }}
+                                            disabled={passed === true || quizSubmitting}
+                                          />
+                                          <span>{choice.label}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+
+                                    {question.explanation && passed === true && (
+                                      <p className="card-meta" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
+                                        Explication: {question.explanation}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+
+                                {passed === true && <div className="empty-state">Quiz réussi.</div>}
+
+                                {passed !== true && quizSubmitMessage && (
+                                  <p className="card-text" style={{ color: "#991b1b", margin: 0 }}>
+                                    {quizSubmitMessage}
                                   </p>
                                 )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+
+                                <div>
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={() => void submitQuiz()}
+                                    disabled={passed === true || quizSubmitting}
+                                  >
+                                    {quizSubmitting ? "Envoi..." : "Soumettre le quiz"}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </section>
@@ -1778,205 +1752,6 @@ export default function StatsPage() {
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeModule && (
-        <div className="modal-backdrop" onClick={closeModuleModal}>
-          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <p className="card-meta tf-chip">Module</p>
-                <h3 className="modal-title tf-title">{activeModule.title}</h3>
-                {activeModule.description && <p className="card-text">{activeModule.description}</p>}
-              </div>
-              <button type="button" className="btn" onClick={closeModuleModal}>
-                Fermer
-              </button>
-            </div>
-
-            {!isActiveModuleUnlocked && <div className="empty-state">Verrouillé — valide le quiz du module précédent.</div>}
-
-            {isActiveModuleUnlocked && (
-              <>
-                <div role="tablist" aria-label="Contenu du module" style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => setActiveTab("lessons")}
-                    aria-pressed={activeTab === "lessons"}
-                    style={activeTab === "lessons" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
-                  >
-                    Leçons
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => setActiveTab("quiz")}
-                    aria-pressed={activeTab === "quiz"}
-                    style={activeTab === "quiz" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
-                  >
-                    Quiz
-                  </button>
-                </div>
-
-                {activeTab === "lessons" && (
-                  <>
-                    {activeModuleLessons.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
-
-                    {activeModuleLessons.length > 0 && (
-                      <div className="tf-scroll" style={{ display: "grid", gap: 8 }}>
-                        {activeModuleLessons.map((lesson) => {
-                          const isActive = activeLesson?.id === lesson.id;
-
-                          return (
-                            <button
-                              key={lesson.id}
-                              type="button"
-                              className="card-button tf-card"
-                              onClick={() => setActiveLessonId(lesson.id)}
-                              style={isActive ? { borderColor: "#111827" } : undefined}
-                              aria-label={`Ouvrir la leçon ${lesson.title}`}
-                            >
-                              <h4 className="card-title tf-title">{lesson.title}</h4>
-                              <p className="card-meta">
-                                {getLessonTypeLabel(lesson.content_type)}
-                                {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
-                              </p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {activeLesson && (
-                      <div style={{ marginTop: 14 }}>
-                        <h4 className="subsection-title">{activeLesson.title}</h4>
-
-                        {activeLesson.content_type?.toLowerCase() === "video" && (
-                          <>
-                            {activeLesson.tella_url ? (
-                              <div className="modal-video">
-                                <iframe
-                                  src={activeLesson.tella_url}
-                                  title={activeLesson.title}
-                                  allow="autoplay; fullscreen; picture-in-picture"
-                                  allowFullScreen
-                                />
-                              </div>
-                            ) : (
-                              <div className="empty-state">Vidéo indisponible pour cette leçon.</div>
-                            )}
-                          </>
-                        )}
-
-                        {activeLesson.content_type?.toLowerCase() === "lecture" && (
-                          <>
-                            {activeLesson.content_markdown ? (
-                              <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
-                                {activeLesson.content_markdown}
-                              </p>
-                            ) : (
-                              <div className="empty-state">Contenu de lecture indisponible pour cette leçon.</div>
-                            )}
-                          </>
-                        )}
-
-                        <div style={{ marginTop: 14 }}>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() => void markLessonAsCompleted(activeLesson.id)}
-                            disabled={isActiveLessonCompleted || lessonProgressSubmittingId === activeLesson.id}
-                          >
-                            {isActiveLessonCompleted
-                              ? "Leçon terminée"
-                              : lessonProgressSubmittingId === activeLesson.id
-                                ? "Enregistrement..."
-                                : "Marquer comme terminée"}
-                          </button>
-
-                          {lessonProgressMessage && (
-                            <p
-                              className="card-meta"
-                              style={{ marginTop: 8, color: lessonProgressMessage === "Leçon terminée." ? "#166534" : "#991b1b" }}
-                            >
-                              {lessonProgressMessage}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {activeTab === "quiz" && (
-                  <>
-                    {quizLoading && <p className="muted">Chargement du quiz...</p>}
-                    {!quizLoading && quizError && <div className="error-box">Erreur Supabase: {quizError}</div>}
-                    {!quizLoading && !quizError && (quizUnavailable || quizQuestions.length === 0) && <div className="empty-state">Quiz non disponible.</div>}
-
-                    {!quizLoading && !quizError && !quizUnavailable && quizQuestions.length > 0 && (
-                      <div className="tf-scroll" style={{ display: "grid", gap: 12 }}>
-                        {quizQuestions.map((question, questionIndex) => (
-                          <div key={question.id} className="card tf-card">
-                            <p className="card-meta">Question {questionIndex + 1}</p>
-                            <p className="card-text">{question.prompt}</p>
-
-                            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                              {(shuffledChoicesByQuestionId[question.id] ?? question.choices).map((choice) => (
-                                <label key={choice.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                                  <input
-                                    type="radio"
-                                    name={`question-${question.id}`}
-                                    value={choice.id}
-                                    checked={selectedAnswers[question.id] === choice.id}
-                                    onChange={() => {
-                                      setSelectedAnswers((current) => ({ ...current, [question.id]: choice.id }));
-                                      if (quizSubmitMessage) {
-                                        setQuizSubmitMessage("");
-                                      }
-                                    }}
-                                    disabled={passed === true || quizSubmitting}
-                                  />
-                                  <span>{choice.label}</span>
-                                </label>
-                              ))}
-                            </div>
-
-                            {question.explanation && passed === true && (
-                              <p className="card-meta" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
-                                Explication: {question.explanation}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-
-                        {passed === true && <div className="empty-state">Quiz réussi.</div>}
-
-                        {passed !== true && quizSubmitMessage && (
-                          <p className="card-text" style={{ color: "#991b1b", margin: 0 }}>
-                            {quizSubmitMessage}
-                          </p>
-                        )}
-
-                        <div>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={() => void submitQuiz()}
-                            disabled={passed === true || quizSubmitting}
-                          >
-                            {quizSubmitting ? "Envoi..." : "Soumettre le quiz"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
             )}
           </div>
         </div>

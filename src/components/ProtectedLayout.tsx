@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 type EngagementState = {
@@ -48,6 +48,7 @@ function isMissingUserEngagementTable(error: { code?: string; message?: string }
 
 export default function ProtectedLayout() {
   const [engagement, setEngagement] = useState<EngagementState | null>(null);
+  const location = useLocation();
 
   useEffect(() => {
     let isMounted = true;
@@ -111,6 +112,11 @@ export default function ProtectedLayout() {
 
   const level = engagement ? Math.floor(Math.max(0, engagement.xp) / 200) + 1 : null;
   const cadenceLabel = engagement?.cadence_unit === "day" ? "jour" : "semaine";
+  const isDashboardRoute = location.pathname === "/";
+
+  if (isDashboardRoute) {
+    return <Outlet />;
+  }
 
   return (
     <div className="app-shell">
