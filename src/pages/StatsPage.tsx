@@ -1250,12 +1250,15 @@ export default function StatsPage() {
               <div className="tf-quickActions">
                 <button
                   type="button"
-                  className="card-button tf-card tf-quickCard tf-quickCard--accent"
+                  className="card-button tf-card tf-quickCard tf-quickCard--start"
                   onClick={handleOpenFormationAction}
                   disabled={!nextFormationAction}
                 >
-                  <h4 className="tf-title">Start</h4>
-                  <p>{nextFormationAction ? "Reprendre la prochaine leçon" : "Choisis un module"}</p>
+                  <span className="tf-quickIcon" aria-hidden="true">▶</span>
+                  <span className="tf-quickCardInner">
+                    <h4 className="tf-title">Start</h4>
+                    <p>{nextFormationAction ? "Reprendre la prochaine leçon" : "Choisis un module"}</p>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1266,8 +1269,11 @@ export default function StatsPage() {
                   }}
                   disabled={tasks.length === 0}
                 >
-                  <h4 className="tf-title">Mes tâches</h4>
-                  <p>{todoTasks.length} à faire</p>
+                  <span className="tf-quickIcon" aria-hidden="true">◌</span>
+                  <span className="tf-quickCardInner">
+                    <h4 className="tf-title">Mes tâches</h4>
+                    <p>{todoTasks.length} à faire</p>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1281,16 +1287,22 @@ export default function StatsPage() {
                   }}
                   disabled={upcomingSessionsAll.length + pastSessionsAll.length === 0}
                 >
-                  <h4 className="tf-title">Calendrier</h4>
-                  <p>{sessionsCountInCurrentMonth} jour(x) ce mois-ci</p>
+                  <span className="tf-quickIcon" aria-hidden="true">◷</span>
+                  <span className="tf-quickCardInner">
+                    <h4 className="tf-title">Calendrier</h4>
+                    <p>{sessionsCountInCurrentMonth} jour(x) ce mois-ci</p>
+                  </span>
                 </button>
                 <button
                   type="button"
                   className="card-button tf-card tf-quickCard"
                   onClick={() => setShowBadgesModal(true)}
                 >
-                  <h4 className="tf-title">Profil</h4>
-                  <p>{currentBadge ? currentBadge.name : "Aucun badge"}</p>
+                  <span className="tf-quickIcon" aria-hidden="true">◍</span>
+                  <span className="tf-quickCardInner">
+                    <h4 className="tf-title">Profil</h4>
+                    <p>{currentBadge ? currentBadge.name : "Aucun badge"}</p>
+                  </span>
                 </button>
               </div>
             </div>
@@ -1298,10 +1310,16 @@ export default function StatsPage() {
             <div className="tf-contentRow">
               <section className="tf-leftPane tf-card" style={{ padding: 14 }}>
                 <div className="tf-cardHeader" style={{ alignItems: "center" }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <span className="tf-chip tf-chip--accent">Tous</span>
-                    <span className="tf-chip">À faire</span>
-                    <span className="tf-chip">Fait</span>
+                  <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
+                    <button type="button" className="tf-tab isActive">
+                      Tous
+                    </button>
+                    <button type="button" className="tf-tab">
+                      À faire
+                    </button>
+                    <button type="button" className="tf-tab">
+                      Fait
+                    </button>
                   </div>
                   {badgeLoadError && (
                     <span className="card-meta" style={{ color: "#991b1b" }}>
@@ -1366,30 +1384,43 @@ export default function StatsPage() {
                                     const isCompleted = completedByLessonId[lesson.id] === true;
 
                                     return (
-                                      <button
+                                      <div
                                         key={lesson.id}
-                                        type="button"
-                                        className="tf-lessonRow"
-                                        onClick={() => {
-                                          setActiveTab("lessons");
-                                          setActiveLessonId(lesson.id);
-                                        }}
+                                        className={`tf-lessonRow${isCompleted ? " tf-lessonRow--done" : ""}`}
                                         style={isLessonSelected ? { borderColor: "#AF8732" } : undefined}
-                                        aria-label={`Ouvrir la leçon ${lesson.title}`}
                                       >
-                                        <div className="tf-cardHeader" style={{ alignItems: "center" }}>
-                                          <div>
-                                            <h4 className="card-title tf-title">{lesson.title}</h4>
-                                            <p className="card-meta">
+                                        <button
+                                          type="button"
+                                          className="tf-lessonLeft"
+                                          onClick={() => {
+                                            setActiveTab("lessons");
+                                            setActiveLessonId(lesson.id);
+                                          }}
+                                          aria-label={`Ouvrir la leçon ${lesson.title}`}
+                                        >
+                                          <span className="tf-lessonIcon" aria-hidden="true">
+                                            {lesson.content_type?.toLowerCase() === "video" ? "▶" : "≡"}
+                                          </span>
+                                          <span style={{ minWidth: 0 }}>
+                                            <span className="tf-lessonTitle">{lesson.title}</span>
+                                            <span className="tf-lessonMeta">
                                               {getLessonTypeLabel(lesson.content_type)}
                                               {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
-                                            </p>
-                                          </div>
-                                          <span className={isCompleted ? "tf-chip tf-chip--accent" : "tf-chip"}>
-                                            {isCompleted ? "OK" : "•"}
+                                            </span>
                                           </span>
-                                        </div>
-                                      </button>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="tf-lessonToggle"
+                                          onClick={() => {
+                                            setActiveTab("lessons");
+                                            setActiveLessonId(lesson.id);
+                                          }}
+                                          aria-label={isCompleted ? `Leçon ${lesson.title} terminée` : `Ouvrir la leçon ${lesson.title}`}
+                                        >
+                                          {isCompleted ? "✓" : ""}
+                                        </button>
+                                      </div>
                                     );
                                   })}
 
@@ -1414,10 +1445,10 @@ export default function StatsPage() {
 
               <section className="tf-centerPane tf-card" style={{ padding: 14 }}>
                 <div className="tf-cardHeader">
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      className={activeTab === "lessons" ? "tf-chip tf-chip--accent" : "tf-chip"}
+                      className={`tf-tab${activeTab === "lessons" ? " isActive" : ""}`}
                       onClick={() => setActiveTab("lessons")}
                       disabled={!activeModule}
                     >
@@ -1425,7 +1456,7 @@ export default function StatsPage() {
                     </button>
                     <button
                       type="button"
-                      className={activeTab === "quiz" ? "tf-chip tf-chip--accent" : "tf-chip"}
+                      className={`tf-tab${activeTab === "quiz" ? " isActive" : ""}`}
                       onClick={() => {
                         if (activeModule) {
                           setActiveTab("quiz");
@@ -1465,11 +1496,11 @@ export default function StatsPage() {
 
                     {activeModule && (
                       <>
-                        <div className="tf-cardHeader">
+                        <div className="tf-contentHeader">
                           <div>
                             <p className="card-meta tf-chip tf-chip--accent">Module</p>
-                            <h3 className="subsection-title tf-title">{activeModule.title}</h3>
-                            {activeModule.description && <p className="tf-subtitle">{activeModule.description}</p>}
+                            <h2 className="tf-contentTitle tf-title">{activeModule.title}</h2>
+                            {activeModule.description && <p className="tf-contentSubtitle">{activeModule.description}</p>}
                           </div>
                           {activeTab === "lessons" && activeLesson && (
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end" }}>
@@ -1478,7 +1509,7 @@ export default function StatsPage() {
                               </span>
                               <button
                                 type="button"
-                                className="btn btn-primary"
+                                className={isActiveLessonCompleted ? "tf-btn tf-btn--done" : "tf-btn tf-btn--accent"}
                                 onClick={() => void markLessonAsCompleted(activeLesson.id)}
                                 disabled={isActiveLessonCompleted || lessonProgressSubmittingId === activeLesson.id}
                               >
