@@ -133,10 +133,11 @@
 }
 
 .tf-quickCard--start {
-  border-color: rgba(175, 135, 50, 0.35);
-  background: rgba(175, 135, 50, 0.18);
+  background: rgba(175, 135, 50, 0.22);
+  border-color: rgba(175, 135, 50, 0.4);
 }
 
+.tf-quickText,
 .tf-quickCardInner {
   display: grid;
   gap: 4px;
@@ -144,6 +145,7 @@
 }
 
 .tf-quickIcon {
+  flex: 0 0 34px;
   width: 34px;
   height: 34px;
   border-radius: 12px;
@@ -155,16 +157,16 @@
   flex-shrink: 0;
 }
 
-.tf-quickCard h4 {
-  margin: 0;
+.tf-quickTitle {
   font-size: 14px;
-  line-height: 15px;
+  font-weight: 650;
+  line-height: 1;
 }
 
-.tf-quickCard p {
-  margin: 0;
+.tf-quickMeta {
   font-size: 12px;
   color: var(--text2);
+  margin-top: 4px;
 }
 
 .tf-contentRow {
@@ -224,6 +226,33 @@
   gap: 10px;
 }
 
+.tf-paneTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.tf-paneActions {
+  display: flex;
+  gap: 10px;
+}
+
+.tf-actionPill {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text2);
+  font-weight: 600;
+}
+
+.tf-actionPill:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 .tf-tab {
   height: 34px;
   padding: 0 12px;
@@ -272,7 +301,7 @@
   justify-content: space-between;
   gap: 14px;
   margin: 10px 0;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: var(--radiusSm);
   border: 1px solid var(--border2);
   background: rgba(255, 255, 255, 0.02);
@@ -322,15 +351,16 @@
 
 .tf-lessonMeta {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
+  opacity: 0.85;
 }
 
 .tf-lessonToggle {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  border: 1px solid var(--border2);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: transparent;
   color: var(--text);
   flex-shrink: 0;
@@ -342,8 +372,8 @@
 }
 
 .tf-lessonRow--done .tf-lessonToggle {
-  border-color: rgba(175, 135, 50, 0.35);
-  background: rgba(175, 135, 50, 0.18);
+  border-color: rgba(175, 135, 50, 0.45);
+  background: rgba(175, 135, 50, 0.22);
 }
 
 .tf-quizRow {
@@ -372,6 +402,12 @@
 .tf-contentSubtitle {
   margin-top: 6px;
   color: var(--text2);
+}
+
+.tf-chip--done {
+  border-color: rgba(40, 209, 124, 0.35);
+  background: rgba(40, 209, 124, 0.14);
+  color: rgba(210, 255, 235, 0.95);
 }
 
 .tf-app .section-title,

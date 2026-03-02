@@ -1255,10 +1255,10 @@ export default function StatsPage() {
                   disabled={!nextFormationAction}
                 >
                   <span className="tf-quickIcon" aria-hidden="true">▶</span>
-                  <span className="tf-quickCardInner">
-                    <h4 className="tf-title">Start</h4>
-                    <p>{nextFormationAction ? "Reprendre la prochaine leçon" : "Choisis un module"}</p>
-                  </span>
+                  <div className="tf-quickText">
+                    <div className="tf-quickTitle">Start</div>
+                    <div className="tf-quickMeta">{nextFormationAction ? "Reprendre la prochaine leçon" : "Choisis un module"}</div>
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -1270,10 +1270,10 @@ export default function StatsPage() {
                   disabled={tasks.length === 0}
                 >
                   <span className="tf-quickIcon" aria-hidden="true">◌</span>
-                  <span className="tf-quickCardInner">
-                    <h4 className="tf-title">Mes tâches</h4>
-                    <p>{todoTasks.length} à faire</p>
-                  </span>
+                  <div className="tf-quickText">
+                    <div className="tf-quickTitle">Mes tâches</div>
+                    <div className="tf-quickMeta">{todoTasks.length} à faire</div>
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -1288,10 +1288,10 @@ export default function StatsPage() {
                   disabled={upcomingSessionsAll.length + pastSessionsAll.length === 0}
                 >
                   <span className="tf-quickIcon" aria-hidden="true">◷</span>
-                  <span className="tf-quickCardInner">
-                    <h4 className="tf-title">Calendrier</h4>
-                    <p>{sessionsCountInCurrentMonth} jour(x) ce mois-ci</p>
-                  </span>
+                  <div className="tf-quickText">
+                    <div className="tf-quickTitle">Calendrier</div>
+                    <div className="tf-quickMeta">{sessionsCountInCurrentMonth} jour(x) ce mois-ci</div>
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -1299,10 +1299,10 @@ export default function StatsPage() {
                   onClick={() => setShowBadgesModal(true)}
                 >
                   <span className="tf-quickIcon" aria-hidden="true">◍</span>
-                  <span className="tf-quickCardInner">
-                    <h4 className="tf-title">Profil</h4>
-                    <p>{currentBadge ? currentBadge.name : "Aucun badge"}</p>
-                  </span>
+                  <div className="tf-quickText">
+                    <div className="tf-quickTitle">Profil</div>
+                    <div className="tf-quickMeta">{currentBadge ? currentBadge.name : "Aucun badge"}</div>
+                  </div>
                 </button>
               </div>
             </div>
@@ -1444,7 +1444,7 @@ export default function StatsPage() {
               </section>
 
               <section className="tf-centerPane tf-card" style={{ padding: 14 }}>
-                <div className="tf-cardHeader">
+                <div className="tf-paneTop">
                   <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
                     <button
                       type="button"
@@ -1467,10 +1467,10 @@ export default function StatsPage() {
                       Quiz
                     </button>
                   </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div className="tf-paneActions" style={{ flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      className="btn"
+                      className="tf-actionPill"
                       onClick={() => {
                         setSessionsModalTab("upcoming");
                         setShowAllSessionsModal(true);
@@ -1478,7 +1478,7 @@ export default function StatsPage() {
                     >
                       Séances
                     </button>
-                    <button type="button" className="btn" onClick={handleOpenQuizAction} disabled={!nextQuizAction}>
+                    <button type="button" className="tf-actionPill" onClick={handleOpenQuizAction} disabled={!nextQuizAction}>
                       Quiz suivant
                     </button>
                   </div>
@@ -1504,7 +1504,7 @@ export default function StatsPage() {
                           </div>
                           {activeTab === "lessons" && activeLesson && (
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end" }}>
-                              <span className={isActiveLessonCompleted ? "tf-chip tf-chip--accent" : "tf-chip"}>
+                              <span className={isActiveLessonCompleted ? "tf-chip tf-chip--done" : "tf-chip"}>
                                 {isActiveLessonCompleted ? "Terminée" : "À faire"}
                               </span>
                               <button
@@ -1541,7 +1541,7 @@ export default function StatsPage() {
                               </div>
                             </div>
 
-                            {lessonProgressMessage && (
+                            {lessonProgressMessage && lessonProgressMessage !== "Leçon terminée." && (
                               <p
                                 className="card-meta"
                                 style={{ color: lessonProgressMessage === "Leçon terminée." ? "#166534" : "#991b1b" }}
