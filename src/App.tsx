@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
+import "./styles/make-dashboard.css";
 
 import ProtectedLayout from "./components/ProtectedLayout";
 import { supabase } from "./lib/supabase";
@@ -291,77 +292,81 @@ export default function App() {
   // 4) UI loading (après les hooks, ok)
   if (loading) {
     return (
-      <div className="app-shell">
-        <p className="muted">Chargement...</p>
+      <div className="tf-app">
+        <div className="app-shell">
+          <p className="muted">Chargement...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={isAuthed ? <Navigate to="/" replace /> : <Login />} />
+    <div className="tf-app">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={isAuthed ? <Navigate to="/" replace /> : <Login />} />
 
-        <Route path="/" element={isAuthed ? <ProtectedLayout /> : <Navigate to="/login" replace />}>
-          <Route index element={<StatsPage />} />
-          <Route path="seances" element={<Navigate to="/" replace />} />
-          <Route path="formation" element={<Navigate to="/" replace />} />
-        </Route>
+          <Route path="/" element={isAuthed ? <ProtectedLayout /> : <Navigate to="/login" replace />}>
+            <Route index element={<StatsPage />} />
+            <Route path="seances" element={<Navigate to="/" replace />} />
+            <Route path="formation" element={<Navigate to="/" replace />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to={isAuthed ? "/" : "/login"} replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to={isAuthed ? "/" : "/login"} replace />} />
+        </Routes>
 
-      {isAuthed && onboardingLoading && !showOnboardingModal && <p className="muted">Chargement de ton rythme...</p>}
-      {isAuthed && onboardingError && !showOnboardingModal && <div className="error-box">{onboardingError}</div>}
+        {isAuthed && onboardingLoading && !showOnboardingModal && <p className="muted">Chargement de ton rythme...</p>}
+        {isAuthed && onboardingError && !showOnboardingModal && <div className="error-box">{onboardingError}</div>}
 
-      {isAuthed && showOnboardingModal && (
-        <div className="modal-backdrop">
-          <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="global-cadence-onboarding-title">
-            <div className="modal-header">
-              <div>
-                <h3 id="global-cadence-onboarding-title" className="modal-title">
-                  Configurer ton rythme (30 sec)
-                </h3>
-                <p className="card-text">Pour adapter tes streaks et objectifs.</p>
+        {isAuthed && showOnboardingModal && (
+          <div className="modal-backdrop">
+            <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="global-cadence-onboarding-title">
+              <div className="modal-header">
+                <div>
+                  <h3 id="global-cadence-onboarding-title" className="modal-title">
+                    Configurer ton rythme (30 sec)
+                  </h3>
+                  <p className="card-text">Pour adapter tes streaks et objectifs.</p>
+                </div>
               </div>
-            </div>
 
-            <div className="modal-section">
-              <h4>À quelle fréquence peux-tu avancer ici ?</h4>
-              <div style={{ display: "grid", gap: 8 }}>
-                {CADENCE_OPTIONS.map((option) => {
-                  const isSelected = option.id === selectedCadenceId;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className="btn"
-                      onClick={() => setSelectedCadenceId(option.id)}
-                      aria-pressed={isSelected}
-                      style={isSelected ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
+              <div className="modal-section">
+                <h4>À quelle fréquence peux-tu avancer ici ?</h4>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {CADENCE_OPTIONS.map((option) => {
+                    const isSelected = option.id === selectedCadenceId;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className="btn"
+                        onClick={() => setSelectedCadenceId(option.id)}
+                        aria-pressed={isSelected}
+                        style={isSelected ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            {onboardingError && <div className="error-box">{onboardingError}</div>}
+              {onboardingError && <div className="error-box">{onboardingError}</div>}
 
-            <div style={{ marginTop: 14 }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => void handleValidateOnboarding()}
-                disabled={savingOnboarding}
-              >
-                {savingOnboarding ? "Validation..." : "Valider"}
-              </button>
+              <div style={{ marginTop: 14 }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void handleValidateOnboarding()}
+                  disabled={savingOnboarding}
+                >
+                  {savingOnboarding ? "Validation..." : "Valider"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </BrowserRouter>
+        )}
+      </BrowserRouter>
+    </div>
   );
 }

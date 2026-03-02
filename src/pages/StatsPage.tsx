@@ -1238,310 +1238,413 @@ export default function StatsPage() {
   }
 
   return (
-    <section>
-      <h2 className="section-title">Dashboard</h2>
-      <p className="section-subtitle">Ton espace unique pour avancer sur ta formation et ton coaching.</p>
-
+    <>
       {error && <div className="error-box">{error}</div>}
-      {loading && <p className="muted">Chargement...</p>}
+      {loading && <p className="muted tf-muted">Chargement...</p>}
 
       {!loading && (
-        <>
-          <div className="card-grid">
-            <article className="card">
-              <h3 className="card-title">Formation en cours</h3>
-              <p className="card-text">
-                {nextFormationAction
-                  ? `Leçon suivante : ${nextFormationAction.lesson.title} (Module ${nextFormationAction.module.title}).`
-                  : "Aucune leçon à reprendre pour le moment."}
-              </p>
-              <div className="card-action">
-                <button type="button" className="btn btn-primary" onClick={handleOpenFormationAction} disabled={!nextFormationAction}>
-                  Reprendre la formation
-                </button>
-              </div>
-            </article>
+        <section className="tf-dashboard">
+          <aside className="tf-sidebar">
+            <span className="tf-chip tf-chip--accent">TF</span>
+            <span className="tf-chip">01</span>
+            <span className="tf-chip">02</span>
+            <span className="tf-chip">03</span>
+            <span className="tf-chip">04</span>
+          </aside>
 
-            <article className="card">
-              <h3 className="card-title">Coaching personnel</h3>
-              <p className="card-text">
-                {nextCoachingSession
-                  ? `Séance débloquée : ${nextCoachingSession.theme ?? "Séance sans thème"}.`
-                  : "Aucun coaching prévu pour le moment."}
-              </p>
-              <div className="card-action">
-                {nextCoachingSession && isValidHttpUrl(nextCoachingSession.booking_url) ? (
-                  <a href={nextCoachingSession.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary">
-                    Prendre un rendez-vous
-                  </a>
-                ) : (
-                  <button type="button" className="btn" disabled>
-                    Prendre un rendez-vous
-                  </button>
+          <main className="tf-dashboardMain">
+            <div className="tf-topRow">
+              <section className="tf-card tf-card--flat tf-paneSection">
+                <p className="tf-chip tf-chip--accent">Académie</p>
+                <h2 className="section-title tf-title">Dashboard</h2>
+                <p className="section-subtitle tf-subtitle">Ton espace unique pour avancer sur ta formation et ton coaching.</p>
+                {badgeLoadError && (
+                  <p className="card-meta" style={{ color: "#991b1b" }}>
+                    {badgeLoadError}
+                  </p>
                 )}
-              </div>
-            </article>
-          </div>
+              </section>
 
-          <div className="section-block" style={{ marginTop: 20 }}>
-            <button
-              type="button"
-              className="card-button"
-              onClick={() => setShowBadgesModal(true)}
-              aria-label="Voir tous mes badges"
-              style={{ width: "100%", textAlign: "left" }}
-            >
-              <p className="card-meta">Badge actuel</p>
-              <h3 className="card-title">{currentBadge ? currentBadge.name : "Aucun badge"}</h3>
-              <p className="card-text">
-                {currentBadge ? currentBadge.reachedText : "Commence par terminer une leçon."}
-              </p>
-            </button>
-            {badgeLoadError && (
-              <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
-                {badgeLoadError}
-              </p>
-            )}
-          </div>
-
-          <div className="section-block" style={{ marginTop: 20 }}>
-            <h3 className="subsection-title">Que veux-tu faire maintenant ?</h3>
-            <p className="section-subtitle" style={{ marginBottom: 12 }}>
-              Actions rapides pour avancer.
-            </p>
-
-            {(formationError || sessionsLoadError || quizDataError) && (
-              <div className="error-box">
-                {formationError || sessionsLoadError || quizDataError}
-              </div>
-            )}
-
-            <div className="card-grid">
-              {nextFormationAction ? (
-                <button type="button" className="card-button" onClick={handleOpenFormationAction}>
-                  <h4 className="card-title">Formation</h4>
-                  <p className="card-text">Leçon suivante : {nextFormationAction.lesson.title}</p>
+              <div className="tf-quickActions">
+                <button
+                  type="button"
+                  className="card-button tf-card tf-quickCard tf-btn tf-btn--accent"
+                  onClick={handleOpenFormationAction}
+                  disabled={!nextFormationAction}
+                >
+                  <h4 className="tf-title">Start</h4>
+                  <p>{nextFormationAction ? "Reprendre la prochaine leçon" : "Aucune leçon à reprendre"}</p>
                 </button>
-              ) : (
-                <article className="card" style={{ opacity: 0.72 }}>
-                  <h4 className="card-title">Formation</h4>
-                  <p className="card-text">Aucune leçon à reprendre.</p>
-                </article>
-              )}
-
-              {nextQuizAction ? (
-                <button type="button" className="card-button" onClick={handleOpenQuizAction}>
-                  <h4 className="card-title">Quiz</h4>
-                  <p className="card-text">Quiz à valider : Module {nextQuizAction.title}</p>
+                <button
+                  type="button"
+                  className="card-button tf-card tf-quickCard"
+                  onClick={() => {
+                    setTasksModalTab("todo");
+                    setShowAllTasksModal(true);
+                  }}
+                  disabled={tasks.length === 0}
+                >
+                  <h4 className="tf-title">Mes tâches</h4>
+                  <p>{todoTasks.length} à faire</p>
                 </button>
-              ) : (
-                <article className="card" style={{ opacity: 0.72 }}>
-                  <h4 className="card-title">Quiz</h4>
-                  <p className="card-text">Aucun quiz à valider.</p>
-                </article>
-              )}
-
-              {nextCoachingSession && isValidHttpUrl(nextCoachingSession.booking_url) ? (
-                <a href={nextCoachingSession.booking_url ?? "#"} target="_blank" rel="noreferrer" className="card-button">
-                  <h4 className="card-title">Coaching</h4>
-                  <p className="card-text">
-                    {parseDate(nextCoachingSession.scheduled_at) !== null ? "Séance à replanifier" : "Séance à réserver"} : {nextCoachingSession.theme ?? "Séance sans thème"}
-                  </p>
-                </a>
-              ) : (
-                <article className="card" style={{ opacity: 0.72 }}>
-                  <h4 className="card-title">Coaching</h4>
-                  <p className="card-text">Aucun coaching prévu.</p>
-                </article>
-              )}
+                <button
+                  type="button"
+                  className="card-button tf-card tf-quickCard"
+                  onClick={() => {
+                    const firstDateValue = upcomingSessionsAll[0]?.scheduled_at ?? pastSessionsAll[0]?.scheduled_at ?? null;
+                    const timestamp = parseDate(firstDateValue);
+                    if (timestamp !== null) {
+                      setSelectedCalendarDateKey(toLocalDateKey(new Date(timestamp)));
+                    }
+                  }}
+                  disabled={upcomingSessionsAll.length + pastSessionsAll.length === 0}
+                >
+                  <h4 className="tf-title">Calendrier</h4>
+                  <p>{sessionsCountInCurrentMonth} jour(x) ce mois-ci</p>
+                </button>
+                <button
+                  type="button"
+                  className="card-button tf-card tf-quickCard"
+                  onClick={() => setShowBadgesModal(true)}
+                >
+                  <h4 className="tf-title">Profil</h4>
+                  <p>{currentBadge ? currentBadge.name : "Aucun badge"}</p>
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="section-block">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h3 className="subsection-title" style={{ margin: 0 }}>
-                Prochaines séances
-              </h3>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  setSessionsModalTab("upcoming");
-                  setShowAllSessionsModal(true);
-                }}
-                disabled={sessions.length === 0}
-              >
-                Voir toutes les séances
-              </button>
-            </div>
-            {sessionsLoadError && <div className="error-box">{sessionsLoadError}</div>}
-            {!sessionsLoadError && upcomingSessions.length === 0 && <div className="empty-state">Aucune séance à venir.</div>}
+            <div className="tf-contentRow">
+              <section className="tf-leftPane tf-card">
+                <div className="tf-cardHeader">
+                  <div>
+                    <h3 className="subsection-title tf-title">Vue rapide</h3>
+                    <p className="tf-subtitle">Modules, séances et badge actuel.</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <span className="tf-chip tf-chip--accent">Tous</span>
+                    <span className="tf-chip">À faire</span>
+                    <span className="tf-chip">Fait</span>
+                  </div>
+                </div>
 
-            {!sessionsLoadError && upcomingSessions.length > 0 && (
-              <div className="card-grid">
-                {upcomingSessions.map((session) => {
-                  const formattedDate = formatDate(session.scheduled_at);
-                  return (
-                    <article key={session.id} className="card">
-                      {formattedDate && <p className="card-meta">{formattedDate}</p>}
-                      <h4 className="card-title">{session.theme ?? "Séance sans thème"}</h4>
-                      <p className="card-text clamp-2">{session.objective ?? "Objectif non renseigné."}</p>
+                <div className="tf-scroll">
+                  <div className="tf-paneStack">
+                    <div className="section-block tf-card tf-card--flat">
+                      <button
+                        type="button"
+                        className="card-button tf-card tf-card--flat"
+                        onClick={() => setShowBadgesModal(true)}
+                        aria-label="Voir tous mes badges"
+                        style={{ width: "100%", textAlign: "left" }}
+                      >
+                        <p className="card-meta tf-chip tf-chip--accent">Badge actuel</p>
+                        <h3 className="card-title tf-title">{currentBadge ? currentBadge.name : "Aucun badge"}</h3>
+                        <p className="card-text">{currentBadge ? currentBadge.reachedText : "Commence par terminer une leçon."}</p>
+                      </button>
+                    </div>
 
-                      {isValidHttpUrl(session.booking_url) ? (
-                        <a href={session.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
-                          {parseDate(session.scheduled_at) !== null ? "Replanifier" : "Réserver"}
-                        </a>
-                      ) : (
-                        <p className="card-meta card-action">Lien de réservation non disponible</p>
+                    <div className="section-block tf-card tf-card--flat">
+                      <div className="tf-cardHeader" style={{ flexWrap: "wrap" }}>
+                        <h3 className="subsection-title tf-title" style={{ margin: 0 }}>
+                          Prochaines séances
+                        </h3>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => {
+                            setSessionsModalTab("upcoming");
+                            setShowAllSessionsModal(true);
+                          }}
+                          disabled={sessions.length === 0}
+                        >
+                          Voir toutes
+                        </button>
+                      </div>
+                      {sessionsLoadError && <div className="error-box">{sessionsLoadError}</div>}
+                      {!sessionsLoadError && upcomingSessions.length === 0 && <div className="empty-state">Aucune séance à venir.</div>}
+
+                      {!sessionsLoadError && upcomingSessions.length > 0 && (
+                        <div className="tf-paneGrid">
+                          {upcomingSessions.map((session) => {
+                            const formattedDate = formatDate(session.scheduled_at);
+                            return (
+                              <article key={session.id} className="card tf-card">
+                                {formattedDate && <p className="card-meta">{formattedDate}</p>}
+                                <h4 className="card-title tf-title">{session.theme ?? "Séance sans thème"}</h4>
+                                <p className="card-text clamp-2">{session.objective ?? "Objectif non renseigné."}</p>
+
+                                {isValidHttpUrl(session.booking_url) ? (
+                                  <a href={session.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                                    {parseDate(session.scheduled_at) !== null ? "Replanifier" : "Réserver"}
+                                  </a>
+                                ) : (
+                                  <p className="card-meta card-action">Lien de réservation non disponible</p>
+                                )}
+                              </article>
+                            );
+                          })}
+                        </div>
                       )}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    </div>
 
-          <div className="section-block">
-            <h3 className="subsection-title">Calendrier coaching</h3>
-            <div className="card">
-              <p className="card-meta" style={{ marginBottom: 10, textTransform: "capitalize" }}>
-                {currentMonthLabel}
-              </p>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
-                {weekdayLabels.map((label) => (
-                  <p key={label} className="card-meta" style={{ margin: 0, textAlign: "center", fontSize: "0.78rem" }}>
-                    {label}
-                  </p>
-                ))}
-
-                {calendarCells.map((cell, index) => {
-                  if (cell.kind === "empty") {
-                    return <div key={`empty-${index}`} style={{ minHeight: 34 }} />;
-                  }
-
-                  const isToday =
-                    cell.day === nowDate.getDate() &&
-                    currentMonthStart.getMonth() === nowDate.getMonth() &&
-                    currentMonthStart.getFullYear() === nowDate.getFullYear();
-                  const isSelected = selectedCalendarDateKey === cell.dateKey;
-
-                  return (
-                    <button
-                      key={cell.dateKey}
-                      type="button"
-                      onClick={() => {
-                        if (!cell.hasSessions) {
-                          return;
-                        }
-                        setSelectedCalendarDateKey(cell.dateKey);
-                      }}
-                      disabled={!cell.hasSessions}
-                      aria-label={cell.hasSessions ? `Voir les séances du ${cell.day}` : `Aucune séance le ${cell.day}`}
-                      style={{
-                        minHeight: 34,
-                        borderRadius: 8,
-                        border: `1px solid ${isSelected ? "#111827" : cell.hasSessions ? "#94a3b8" : "#e5e7eb"}`,
-                        background: isSelected ? "#111827" : cell.hasSessions ? "#f8fafc" : "#ffffff",
-                        color: isSelected ? "#ffffff" : "#111827",
-                        cursor: cell.hasSessions ? "pointer" : "default",
-                        fontWeight: isToday ? 700 : 500,
-                      }}
-                    >
-                      {cell.day}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {sessionsCountInCurrentMonth === 0 && (
-                <p className="card-meta" style={{ marginTop: 10 }}>
-                  Aucune séance prévue ce mois-ci.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="section-block">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <h3 className="subsection-title" style={{ margin: 0 }}>
-                Mes tâches
-              </h3>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  setTasksModalTab("todo");
-                  setShowAllTasksModal(true);
-                }}
-                disabled={tasks.length === 0}
-              >
-                Voir toutes les tâches
-              </button>
-            </div>
-            {tasksLoadError && <div className="error-box">{tasksLoadError}</div>}
-            <TasksWidget />
-          </div>
-
-          <div className="section-block">
-            <h3 className="subsection-title">Ma formation</h3>
-
-            {formationError && <div className="error-box">{formationError}</div>}
-            {!formationError && modules.length === 0 && <div className="empty-state">Aucun module disponible.</div>}
-
-            {!formationError && modules.length > 0 && (
-              <div className="card-grid">
-                {modulesSorted.map((module) => {
-                  const isUnlocked = unlockedByModuleId[module.id] === true;
-                  const lessonCount = moduleLessons.filter((lesson) => lesson.module_id === module.id).length;
-
-                  return (
-                    <button
-                      key={module.id}
-                      type="button"
-                      className="card-button"
-                      onClick={() => openModule(module)}
-                      aria-label={`Ouvrir le module ${module.title}`}
-                      disabled={!isUnlocked}
-                      style={!isUnlocked ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
-                    >
-                      <p className="card-meta">Module {module.order_index}</p>
-                      <h4 className="card-title">{module.title}</h4>
-                      <p className="card-text clamp-2">{module.description ?? "Aucune description."}</p>
-                      <p className="card-meta" style={{ marginTop: 10 }}>
-                        {lessonCount} leçon(s)
-                      </p>
-                      {!isUnlocked && (
-                        <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
-                          Verrouillé — valide le quiz du module précédent
+                    <div className="section-block tf-card tf-card--flat">
+                      <h3 className="subsection-title tf-title">Calendrier coaching</h3>
+                      <div className="card tf-card">
+                        <p className="card-meta tf-chip tf-chip--accent" style={{ marginBottom: 10, textTransform: "capitalize" }}>
+                          {currentMonthLabel}
                         </p>
-                      )}
+
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
+                          {weekdayLabels.map((label) => (
+                            <p key={label} className="card-meta" style={{ margin: 0, textAlign: "center", fontSize: "0.78rem" }}>
+                              {label}
+                            </p>
+                          ))}
+
+                          {calendarCells.map((cell, index) => {
+                            if (cell.kind === "empty") {
+                              return <div key={`empty-${index}`} style={{ minHeight: 34 }} />;
+                            }
+
+                            const isToday =
+                              cell.day === nowDate.getDate() &&
+                              currentMonthStart.getMonth() === nowDate.getMonth() &&
+                              currentMonthStart.getFullYear() === nowDate.getFullYear();
+                            const isSelected = selectedCalendarDateKey === cell.dateKey;
+
+                            return (
+                              <button
+                                key={cell.dateKey}
+                                type="button"
+                                onClick={() => {
+                                  if (!cell.hasSessions) {
+                                    return;
+                                  }
+                                  setSelectedCalendarDateKey(cell.dateKey);
+                                }}
+                                disabled={!cell.hasSessions}
+                                aria-label={cell.hasSessions ? `Voir les séances du ${cell.day}` : `Aucune séance le ${cell.day}`}
+                                style={{
+                                  minHeight: 34,
+                                  borderRadius: 8,
+                                  border: `1px solid ${isSelected ? "#111827" : cell.hasSessions ? "#94a3b8" : "#e5e7eb"}`,
+                                  background: isSelected ? "#111827" : cell.hasSessions ? "#f8fafc" : "#ffffff",
+                                  color: isSelected ? "#ffffff" : "#111827",
+                                  cursor: cell.hasSessions ? "pointer" : "default",
+                                  fontWeight: isToday ? 700 : 500,
+                                }}
+                              >
+                                {cell.day}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {sessionsCountInCurrentMonth === 0 && (
+                          <p className="card-meta" style={{ marginTop: 10 }}>
+                            Aucune séance prévue ce mois-ci.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="tf-centerPane tf-card">
+                <div className="tf-cardHeader">
+                  <div>
+                    <h3 className="subsection-title tf-title">Parcours</h3>
+                    <p className="tf-subtitle">Leçons, quiz, tâches et coaching dans une seule vue.</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button type="button" className="tf-chip tf-chip--accent" onClick={handleOpenFormationAction} disabled={!nextFormationAction}>
+                      Leçons
                     </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </>
+                    <button type="button" className="tf-chip" onClick={handleOpenQuizAction} disabled={!nextQuizAction}>
+                      Quiz
+                    </button>
+                  </div>
+                </div>
+
+                <div className="tf-scroll">
+                  <div className="tf-paneStack">
+                    <div className="tf-paneGridTwo">
+                      <article className="card tf-card">
+                        <h3 className="card-title tf-title">Formation en cours</h3>
+                        <p className="card-text">
+                          {nextFormationAction
+                            ? `Leçon suivante : ${nextFormationAction.lesson.title} (Module ${nextFormationAction.module.title}).`
+                            : "Aucune leçon à reprendre pour le moment."}
+                        </p>
+                        <div className="card-action">
+                          <button type="button" className="btn btn-primary" onClick={handleOpenFormationAction} disabled={!nextFormationAction}>
+                            Reprendre la formation
+                          </button>
+                        </div>
+                      </article>
+
+                      <article className="card tf-card">
+                        <h3 className="card-title tf-title">Coaching personnel</h3>
+                        <p className="card-text">
+                          {nextCoachingSession
+                            ? `Séance débloquée : ${nextCoachingSession.theme ?? "Séance sans thème"}.`
+                            : "Aucun coaching prévu pour le moment."}
+                        </p>
+                        <div className="card-action">
+                          {nextCoachingSession && isValidHttpUrl(nextCoachingSession.booking_url) ? (
+                            <a href={nextCoachingSession.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary">
+                              Prendre un rendez-vous
+                            </a>
+                          ) : (
+                            <button type="button" className="btn" disabled>
+                              Prendre un rendez-vous
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    </div>
+
+                    <div className="section-block tf-card">
+                      <h3 className="subsection-title tf-title">Que veux-tu faire maintenant ?</h3>
+                      <p className="section-subtitle tf-subtitle" style={{ marginBottom: 12 }}>
+                        Actions rapides pour avancer.
+                      </p>
+
+                      {(formationError || sessionsLoadError || quizDataError) && (
+                        <div className="error-box">
+                          {formationError || sessionsLoadError || quizDataError}
+                        </div>
+                      )}
+
+                      <div className="card-grid">
+                        {nextFormationAction ? (
+                          <button type="button" className="card-button tf-card" onClick={handleOpenFormationAction}>
+                            <h4 className="card-title tf-title">Formation</h4>
+                            <p className="card-text">Leçon suivante : {nextFormationAction.lesson.title}</p>
+                          </button>
+                        ) : (
+                          <article className="card tf-card" style={{ opacity: 0.72 }}>
+                            <h4 className="card-title tf-title">Formation</h4>
+                            <p className="card-text">Aucune leçon à reprendre.</p>
+                          </article>
+                        )}
+
+                        {nextQuizAction ? (
+                          <button type="button" className="card-button tf-card" onClick={handleOpenQuizAction}>
+                            <h4 className="card-title tf-title">Quiz</h4>
+                            <p className="card-text">Quiz à valider : Module {nextQuizAction.title}</p>
+                          </button>
+                        ) : (
+                          <article className="card tf-card" style={{ opacity: 0.72 }}>
+                            <h4 className="card-title tf-title">Quiz</h4>
+                            <p className="card-text">Aucun quiz à valider.</p>
+                          </article>
+                        )}
+
+                        {nextCoachingSession && isValidHttpUrl(nextCoachingSession.booking_url) ? (
+                          <a href={nextCoachingSession.booking_url ?? "#"} target="_blank" rel="noreferrer" className="card-button tf-card">
+                            <h4 className="card-title tf-title">Coaching</h4>
+                            <p className="card-text">
+                              {parseDate(nextCoachingSession.scheduled_at) !== null ? "Séance à replanifier" : "Séance à réserver"} : {nextCoachingSession.theme ?? "Séance sans thème"}
+                            </p>
+                          </a>
+                        ) : (
+                          <article className="card tf-card" style={{ opacity: 0.72 }}>
+                            <h4 className="card-title tf-title">Coaching</h4>
+                            <p className="card-text">Aucun coaching prévu.</p>
+                          </article>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="section-block tf-card">
+                      <div className="tf-cardHeader" style={{ flexWrap: "wrap" }}>
+                        <h3 className="subsection-title tf-title" style={{ margin: 0 }}>
+                          Mes tâches
+                        </h3>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => {
+                            setTasksModalTab("todo");
+                            setShowAllTasksModal(true);
+                          }}
+                          disabled={tasks.length === 0}
+                        >
+                          Voir toutes les tâches
+                        </button>
+                      </div>
+                      {tasksLoadError && <div className="error-box">{tasksLoadError}</div>}
+                      <div className="tf-scroll" style={{ maxHeight: 340 }}>
+                        <TasksWidget />
+                      </div>
+                    </div>
+
+                    <div className="section-block tf-card">
+                      <h3 className="subsection-title tf-title">Ma formation</h3>
+
+                      {formationError && <div className="error-box">{formationError}</div>}
+                      {!formationError && modules.length === 0 && <div className="empty-state">Aucun module disponible.</div>}
+
+                      {!formationError && modules.length > 0 && (
+                        <div className="card-grid tf-scroll" style={{ maxHeight: 520 }}>
+                          {modulesSorted.map((module) => {
+                            const isUnlocked = unlockedByModuleId[module.id] === true;
+                            const lessonCount = moduleLessons.filter((lesson) => lesson.module_id === module.id).length;
+
+                            return (
+                              <button
+                                key={module.id}
+                                type="button"
+                                className="card-button tf-card"
+                                onClick={() => openModule(module)}
+                                aria-label={`Ouvrir le module ${module.title}`}
+                                disabled={!isUnlocked}
+                                style={!isUnlocked ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
+                              >
+                                <p className="card-meta">Module {module.order_index}</p>
+                                <h4 className="card-title tf-title">{module.title}</h4>
+                                <p className="card-text clamp-2">{module.description ?? "Aucune description."}</p>
+                                <p className="card-meta" style={{ marginTop: 10 }}>
+                                  {lessonCount} leçon(s)
+                                </p>
+                                {!isUnlocked && (
+                                  <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
+                                    Verrouillé — valide le quiz du module précédent
+                                  </p>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </main>
+        </section>
       )}
 
-      {showBadgesModal && (
+        {showBadgesModal && (
         <div className="modal-backdrop" onClick={() => setShowBadgesModal(false)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
+          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
               <div>
-                <h3 className="modal-title">Tous mes badges</h3>
+                <h3 className="modal-title tf-title">Tous mes badges</h3>
               </div>
               <button type="button" className="btn" onClick={() => setShowBadgesModal(false)}>
                 Fermer
               </button>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, overflowY: "auto", maxHeight: "65vh" }}>
+            <div className="tf-scroll" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, maxHeight: "65vh" }}>
               {badges.map((badge) => (
-                <article key={badge.id} className="card" style={badge.unlocked ? undefined : { opacity: 0.6 }}>
-                  <p className="card-meta">{badge.unlocked ? "Débloqué" : "À débloquer"}</p>
-                  <h4 className="card-title">{badge.name}</h4>
+                <article key={badge.id} className="card tf-card" style={badge.unlocked ? undefined : { opacity: 0.6 }}>
+                  <p className="card-meta tf-chip">{badge.unlocked ? "Débloqué" : "À débloquer"}</p>
+                  <h4 className="card-title tf-title">{badge.name}</h4>
                   <p className="card-text">{badge.conditionText}</p>
                 </article>
               ))}
@@ -1550,12 +1653,12 @@ export default function StatsPage() {
         </div>
       )}
 
-      {showAllSessionsModal && (
+        {showAllSessionsModal && (
         <div className="modal-backdrop" onClick={() => setShowAllSessionsModal(false)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()} style={{ width: "min(860px, 100%)", maxHeight: "85vh" }}>
+          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(860px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
               <div>
-                <h3 className="modal-title">Toutes les séances</h3>
+                <h3 className="modal-title tf-title">Toutes les séances</h3>
               </div>
               <button type="button" className="btn" onClick={() => setShowAllSessionsModal(false)}>
                 Fermer
@@ -1586,18 +1689,18 @@ export default function StatsPage() {
             {sessionsLoadError && <div className="error-box">{sessionsLoadError}</div>}
 
             {!sessionsLoadError && (
-              <div style={{ display: "grid", gap: 8, overflowY: "auto", maxHeight: "65vh" }}>
+              <div className="tf-scroll" style={{ display: "grid", gap: 8, maxHeight: "65vh" }}>
                 {(sessionsModalTab === "upcoming" ? upcomingSessionsAll : pastSessionsAll).map((session) => {
                   const formattedDate = formatDate(session.scheduled_at);
                   const isCompleted = session.status?.toLowerCase() === "completed";
                   const canReplan = !isCompleted && isValidHttpUrl(session.booking_url);
 
                   return (
-                    <article key={session.id} className="card">
+                    <article key={session.id} className="card tf-card">
                       <p className="card-meta">
                         {formattedDate ?? "Date non planifiée"} · {isCompleted ? "Passée" : "À venir"}
                       </p>
-                      <h4 className="card-title">{session.theme ?? "Séance sans thème"}</h4>
+                      <h4 className="card-title tf-title">{session.theme ?? "Séance sans thème"}</h4>
                       <p className="card-text">{session.objective ?? "Objectif non renseigné."}</p>
                       {canReplan && (
                         <a href={session.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
@@ -1619,12 +1722,12 @@ export default function StatsPage() {
         </div>
       )}
 
-      {showAllTasksModal && (
+        {showAllTasksModal && (
         <div className="modal-backdrop" onClick={() => setShowAllTasksModal(false)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
+          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
               <div>
-                <h3 className="modal-title">Toutes les tâches</h3>
+                <h3 className="modal-title tf-title">Toutes les tâches</h3>
               </div>
               <button type="button" className="btn" onClick={() => setShowAllTasksModal(false)}>
                 Fermer
@@ -1655,14 +1758,14 @@ export default function StatsPage() {
             {tasksLoadError && <div className="error-box">{tasksLoadError}</div>}
 
             {!tasksLoadError && (
-              <div style={{ display: "grid", gap: 8, overflowY: "auto", maxHeight: "65vh" }}>
+              <div className="tf-scroll" style={{ display: "grid", gap: 8, maxHeight: "65vh" }}>
                 {(tasksModalTab === "todo" ? todoTasks : doneTasks).map((task) => (
-                  <article key={task.id} className="card">
+                  <article key={task.id} className="card tf-card">
                     <p className="card-meta">
                       Échéance: {formatDueDate(task.due_date)}
                       {task.est_minutes ? ` · ${task.est_minutes} min` : ""}
                     </p>
-                    <h4 className="card-title">{task.title}</h4>
+                    <h4 className="card-title tf-title">{task.title}</h4>
                     <p className="card-text">
                       {tasksModalTab === "todo" ? getPriorityLabel(task.priority) : "Terminée"}
                     </p>
@@ -1682,11 +1785,11 @@ export default function StatsPage() {
 
       {activeModule && (
         <div className="modal-backdrop" onClick={closeModuleModal}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <p className="card-meta">Module</p>
-                <h3 className="modal-title">{activeModule.title}</h3>
+                <p className="card-meta tf-chip">Module</p>
+                <h3 className="modal-title tf-title">{activeModule.title}</h3>
                 {activeModule.description && <p className="card-text">{activeModule.description}</p>}
               </div>
               <button type="button" className="btn" onClick={closeModuleModal}>
@@ -1724,7 +1827,7 @@ export default function StatsPage() {
                     {activeModuleLessons.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
 
                     {activeModuleLessons.length > 0 && (
-                      <div style={{ display: "grid", gap: 8 }}>
+                      <div className="tf-scroll" style={{ display: "grid", gap: 8 }}>
                         {activeModuleLessons.map((lesson) => {
                           const isActive = activeLesson?.id === lesson.id;
 
@@ -1732,12 +1835,12 @@ export default function StatsPage() {
                             <button
                               key={lesson.id}
                               type="button"
-                              className="card-button"
+                              className="card-button tf-card"
                               onClick={() => setActiveLessonId(lesson.id)}
                               style={isActive ? { borderColor: "#111827" } : undefined}
                               aria-label={`Ouvrir la leçon ${lesson.title}`}
                             >
-                              <h4 className="card-title">{lesson.title}</h4>
+                              <h4 className="card-title tf-title">{lesson.title}</h4>
                               <p className="card-meta">
                                 {getLessonTypeLabel(lesson.content_type)}
                                 {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
@@ -1816,9 +1919,9 @@ export default function StatsPage() {
                     {!quizLoading && !quizError && (quizUnavailable || quizQuestions.length === 0) && <div className="empty-state">Quiz non disponible.</div>}
 
                     {!quizLoading && !quizError && !quizUnavailable && quizQuestions.length > 0 && (
-                      <div style={{ display: "grid", gap: 12 }}>
+                      <div className="tf-scroll" style={{ display: "grid", gap: 12 }}>
                         {quizQuestions.map((question, questionIndex) => (
-                          <div key={question.id} className="card">
+                          <div key={question.id} className="card tf-card">
                             <p className="card-meta">Question {questionIndex + 1}</p>
                             <p className="card-text">{question.prompt}</p>
 
@@ -1881,10 +1984,10 @@ export default function StatsPage() {
 
       {selectedCalendarDateKey && (
         <div className="modal-backdrop" onClick={() => setSelectedCalendarDateKey(null)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()} style={{ width: "min(720px, 100%)", maxHeight: "85vh" }}>
+          <div className="modal-panel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(720px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
               <div>
-                <h3 className="modal-title">Séances du {selectedDateReadable}</h3>
+                <h3 className="modal-title tf-title">Séances du {selectedDateReadable}</h3>
               </div>
               <button type="button" className="btn" onClick={() => setSelectedCalendarDateKey(null)}>
                 Fermer
@@ -1894,7 +1997,7 @@ export default function StatsPage() {
             {selectedDaySessions.length === 0 && <div className="empty-state">Aucune séance ce jour.</div>}
 
             {selectedDaySessions.length > 0 && (
-              <div style={{ display: "grid", gap: 8 }}>
+              <div className="tf-scroll" style={{ display: "grid", gap: 8 }}>
                 {selectedDaySessions.map((session) => {
                   const hourLabel = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(
                     new Date(parseDate(session.scheduled_at) ?? Date.now())
@@ -1903,11 +2006,11 @@ export default function StatsPage() {
                   const canReplan = statusLabel === "planned" && isValidHttpUrl(session.booking_url);
 
                   return (
-                    <article key={session.id} className="card">
+                    <article key={session.id} className="card tf-card">
                       <p className="card-meta">
                         {hourLabel} · {statusLabel}
                       </p>
-                      <h4 className="card-title">{session.theme ?? "Séance sans thème"}</h4>
+                      <h4 className="card-title tf-title">{session.theme ?? "Séance sans thème"}</h4>
 
                       {canReplan && (
                         <a href={session.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
@@ -1922,6 +2025,6 @@ export default function StatsPage() {
           </div>
         </div>
       )}
-    </section>
+    </>
   );
 }

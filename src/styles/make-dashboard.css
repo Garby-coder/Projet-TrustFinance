@@ -1,0 +1,404 @@
+.tf-app {
+  --bg: #080808;
+  --panel: #0d0d0d;
+  --card: #111111;
+  --card2: #0f0f0f;
+  --text: rgba(245, 245, 245, 0.92);
+  --text2: rgba(245, 245, 245, 0.72);
+  --muted: rgba(245, 245, 245, 0.45);
+  --border: rgba(255, 255, 255, 0.07);
+  --border2: rgba(255, 255, 255, 0.05);
+  --accent: #af8732;
+  --accent2: rgba(175, 135, 50, 0.22);
+  --green: #28d17c;
+  --orange: #ff7a18;
+  --blue: #2f7cff;
+  --radius: 18px;
+  --radiusSm: 14px;
+  --shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.tf-app * {
+  box-sizing: border-box;
+}
+
+.tf-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.tf-card--flat {
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tf-title {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.tf-subtitle {
+  color: var(--text2);
+}
+
+.tf-muted {
+  color: var(--muted);
+}
+
+.tf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text2);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.tf-chip--accent {
+  border-color: rgba(175, 135, 50, 0.25);
+  background: rgba(175, 135, 50, 0.1);
+  color: var(--text);
+}
+
+.tf-btn {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 10px 14px;
+}
+
+.tf-btn--accent {
+  border-color: rgba(175, 135, 50, 0.35);
+  background: rgba(175, 135, 50, 0.25);
+}
+
+.tf-dashboard {
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+.tf-sidebar {
+  border-radius: var(--radius);
+  border: 1px solid var(--border2);
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 10px;
+  gap: 18px;
+}
+
+.tf-dashboardMain {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.tf-topRow {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.tf-quickActions {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr 1fr;
+  gap: 14px;
+}
+
+.tf-quickCard {
+  height: 72px;
+  padding: 14px;
+  border-radius: var(--radius);
+}
+
+.tf-quickCard h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.tf-quickCard p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.tf-contentRow {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.tf-leftPane,
+.tf-centerPane {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+}
+
+.tf-scroll {
+  min-height: 0;
+  overflow: auto;
+  scrollbar-color: rgba(175, 135, 50, 0.35) transparent;
+}
+
+.tf-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tf-scroll::-webkit-scrollbar-thumb {
+  background: rgba(175, 135, 50, 0.28);
+  border-radius: 999px;
+}
+
+.tf-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tf-paneStack {
+  display: grid;
+  gap: 12px;
+}
+
+.tf-paneSection {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.tf-paneGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.tf-paneGridTwo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tf-app .section-title,
+.tf-app .subsection-title,
+.tf-app .modal-title,
+.tf-app .card-title,
+.tf-app h4 {
+  margin: 0;
+  color: var(--text);
+}
+
+.tf-app .section-subtitle,
+.tf-app .card-text,
+.tf-app .card-text a {
+  color: var(--text2);
+}
+
+.tf-app .card-meta,
+.tf-app .muted {
+  color: var(--muted);
+}
+
+.tf-app .card,
+.tf-app .card-button,
+.tf-app .section-block,
+.tf-app .modal-panel,
+.tf-app .task-row,
+.tf-app .tasks-section,
+.tf-app .priority-badge,
+.tf-app .tasks-list {
+  border-color: var(--border);
+}
+
+.tf-app .card,
+.tf-app .card-button,
+.tf-app .section-block,
+.tf-app .modal-panel,
+.tf-app .task-row,
+.tf-app .tasks-section,
+.tf-app .tasks-list,
+.tf-app .modal-video,
+.tf-app .empty-state,
+.tf-app .error-box {
+  border-radius: var(--radiusSm);
+}
+
+.tf-app .card,
+.tf-app .card-button,
+.tf-app .section-block,
+.tf-app .modal-panel,
+.tf-app .task-row,
+.tf-app .tasks-section,
+.tf-app .tasks-list,
+.tf-app .modal-video,
+.tf-app .empty-state {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tf-app .card,
+.tf-app .section-block,
+.tf-app .modal-panel,
+.tf-app .task-row,
+.tf-app .tasks-section,
+.tf-app .tasks-list,
+.tf-app .empty-state,
+.tf-app .error-box {
+  border: 1px solid var(--border);
+}
+
+.tf-app .card,
+.tf-app .section-block,
+.tf-app .modal-panel {
+  padding: 14px;
+}
+
+.tf-app .card-button {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  border: 1px solid var(--border);
+}
+
+.tf-app .card-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.tf-app .card-action {
+  margin-top: 12px;
+}
+
+.tf-app .clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tf-app .btn,
+.tf-app .tf-btn {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 10px 14px;
+}
+
+.tf-app .btn.btn-primary,
+.tf-app .tf-btn--accent {
+  border-color: rgba(175, 135, 50, 0.35);
+  background: rgba(175, 135, 50, 0.25);
+}
+
+.tf-app .btn:disabled,
+.tf-app .card-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tf-app .error-box {
+  background: rgba(127, 29, 29, 0.22);
+  border-color: rgba(220, 38, 38, 0.22);
+  color: var(--text);
+}
+
+.tf-app .modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 8, 8, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+}
+
+.tf-app .modal-panel {
+  width: min(860px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  box-shadow: var(--shadow);
+}
+
+.tf-app .modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tf-app .tasks-widget {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.tf-app .tasks-section,
+.tf-app .tasks-list,
+.tf-app .task-row {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+@media (max-width: 1200px) {
+  .tf-dashboard {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .tf-topRow {
+    grid-template-columns: 1fr;
+  }
+
+  .tf-quickActions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tf-contentRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .tf-dashboard {
+    height: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .tf-sidebar {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .tf-contentRow,
+  .tf-topRow,
+  .tf-quickActions,
+  .tf-paneGridTwo {
+    grid-template-columns: 1fr;
+  }
+}
