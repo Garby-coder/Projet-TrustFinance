@@ -1567,9 +1567,6 @@ export default function StatsPage() {
                         Fait
                       </button>
                     </div>
-                    <button type="button" className="tf-actionPill" onClick={collapseAllModules} disabled={!expandedModuleId}>
-                      Replier
-                    </button>
                   </div>
                   {badgeLoadError && (
                     <span className="card-meta" style={{ color: "#991b1b" }}>
@@ -1626,13 +1623,7 @@ export default function StatsPage() {
                               aria-label={`Ouvrir le module ${module.title}`}
                               aria-expanded={isSelected}
                               disabled={!isUnlocked}
-                              style={
-                                !isUnlocked
-                                  ? { opacity: 0.7, cursor: "not-allowed" }
-                                  : isSelected
-                                    ? { borderColor: "#AF8732" }
-                                    : undefined
-                              }
+                              style={!isUnlocked ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
                             >
                               <div className="tf-moduleTop">
                                 <div className="tf-moduleTitleBlock">
