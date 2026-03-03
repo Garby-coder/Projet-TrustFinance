@@ -883,9 +883,8 @@ export default function StatsPage() {
   const activeModuleLessons = activeModule
     ? moduleLessons.filter((lesson) => lesson.module_id === activeModule.id).sort((a, b) => a.order_index - b.order_index)
     : [];
-  const activeLesson = activeModuleLessons.find((lesson) => lesson.id === activeLessonId) ?? activeModuleLessons[0] ?? null;
-  const activeLessonModuleId =
-    moduleLessons.find((lesson) => lesson.id === activeLessonId)?.module_id ?? activeModule?.id ?? null;
+  const activeLesson = activeLessonId ? activeModuleLessons.find((lesson) => lesson.id === activeLessonId) ?? null : null;
+  const activeLessonModuleId = moduleLessons.find((lesson) => lesson.id === activeLessonId)?.module_id ?? null;
   const isActiveLessonCompleted = activeLesson ? completedByLessonId[activeLesson.id] === true : false;
   const isActiveModuleUnlocked = activeModule ? unlockedByModuleId[activeModule.id] === true : false;
   const activeStatus = activeModule
@@ -909,11 +908,11 @@ export default function StatsPage() {
       return;
     }
 
-    const lessons = moduleLessons.filter((item) => item.module_id === module.id).sort((a, b) => a.order_index - b.order_index);
-
     setExpandedModuleId(module.id);
     setActiveModule(module);
-    setActiveLessonId(lessonId ?? lessons[0]?.id ?? null);
+    if (lessonId !== null) {
+      setActiveLessonId(lessonId);
+    }
     setActiveTab(tab);
     setLoadedQuizModuleId(null);
     setQuizSubmitMessage("");
@@ -967,7 +966,7 @@ export default function StatsPage() {
       null;
 
     if (targetModule) {
-      openModule(targetModule, "lessons", nextFormationAction?.module.id === targetModule.id ? nextFormationAction.lesson.id : null);
+      setExpandedModuleId(targetModule.id);
     }
 
     didAutoOpen.current = true;
