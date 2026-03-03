@@ -900,6 +900,7 @@ export default function StatsPage() {
               passed === true || passedByModuleId[activeModule.id] === true ? "tf-chip tf-chip--done" : "tf-chip",
           }
     : null;
+  const canMarkLessonDone = activeTab === "lessons" && !!activeLesson && isActiveModuleUnlocked && !isActiveLessonCompleted;
 
   function openModule(module: ModuleItem, tab: "lessons" | "quiz" = "lessons", lessonId: string | null = null) {
     if (unlockedByModuleId[module.id] !== true) {
@@ -1011,21 +1012,6 @@ export default function StatsPage() {
                 {activeLesson.duration_min ? ` · ${activeLesson.duration_min} min` : ""}
               </p>
             </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className={isActiveLessonCompleted ? "tf-btn tf-btn--done" : "tf-btn tf-btn--accent"}
-              onClick={() => void markLessonAsCompleted(activeLesson.id)}
-              disabled={isActiveLessonCompleted || lessonProgressSubmittingId === activeLesson.id}
-            >
-              {isActiveLessonCompleted
-                ? "Leçon terminée"
-                : lessonProgressSubmittingId === activeLesson.id
-                  ? "Enregistrement..."
-                  : "Marquer comme terminée"}
-            </button>
           </div>
 
           {lessonProgressMessage && lessonProgressMessage !== "Leçon terminée." && (
@@ -1744,7 +1730,18 @@ export default function StatsPage() {
                           <div className="tf-titleRow">
                             <h2 className="tf-contentTitle tf-title">{activeModule.title}</h2>
                             <div className="tf-titleActions">
-                              {activeStatus && <span className={activeStatus.className}>{activeStatus.label}</span>}
+                              {canMarkLessonDone && activeLesson ? (
+                                <button
+                                  type="button"
+                                  className="tf-btn tf-btn--accent tf-primaryBtn--compact"
+                                  onClick={() => void markLessonAsCompleted(activeLesson.id)}
+                                  disabled={lessonProgressSubmittingId === activeLesson.id}
+                                >
+                                  {lessonProgressSubmittingId === activeLesson.id ? "Enregistrement..." : "Marquer comme terminée"}
+                                </button>
+                              ) : (
+                                activeStatus && <span className={activeStatus.className}>{activeStatus.label}</span>
+                              )}
                               <button
                                 type="button"
                                 className="tf-actionPill"
