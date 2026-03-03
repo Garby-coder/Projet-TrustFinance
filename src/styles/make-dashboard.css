@@ -144,20 +144,29 @@
 }
 
 .tf-startCta {
-  background: #383020;
-  border: 1px solid #705828;
   border-radius: 18px;
   padding: 18px 22px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
-.tf-startCta:hover {
-  background: #42371f;
-  border-color: #7a6130;
+button.tf-startCta,
+a.tf-startCta,
+.tf-startCta {
+  background: #383020 !important;
+  border: 1px solid #705828 !important;
 }
 
+button.tf-startCta:hover,
+a.tf-startCta:hover,
+.tf-startCta:hover {
+  background: #42371f !important;
+  border-color: #7a6130 !important;
+}
+
+button.tf-startCta:active,
+a.tf-startCta:active,
 .tf-startCta:active {
-  background: #332b19;
+  background: #332b19 !important;
 }
 
 .tf-quickText,
