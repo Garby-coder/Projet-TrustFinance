@@ -337,6 +337,7 @@ export default function StatsPage() {
   const [showAllTasksModal, setShowAllTasksModal] = useState(false);
   const [tasksModalTab, setTasksModalTab] = useState<"todo" | "done">("todo");
   const [showBadgesModal, setShowBadgesModal] = useState(false);
+  const [showExpandedContent, setShowExpandedContent] = useState(false);
   const moduleRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -629,22 +630,6 @@ export default function StatsPage() {
     return null;
   })();
 
-  const nextQuizAction = (() => {
-    for (const module of modulesSorted) {
-      if (unlockedByModuleId[module.id] !== true) {
-        continue;
-      }
-
-      const moduleHasQuiz = quizRequiredByModuleId[module.id] === true;
-      const modulePassedQuiz = passedByModuleId[module.id] === true;
-      if (moduleHasQuiz && !modulePassedQuiz) {
-        return module;
-      }
-    }
-
-    return null;
-  })();
-
   const now = Date.now();
   const upcomingSessionsAll = sessions
     .filter((session) => {
@@ -842,6 +827,20 @@ export default function StatsPage() {
   const activeLesson = activeModuleLessons.find((lesson) => lesson.id === activeLessonId) ?? activeModuleLessons[0] ?? null;
   const isActiveLessonCompleted = activeLesson ? completedByLessonId[activeLesson.id] === true : false;
   const isActiveModuleUnlocked = activeModule ? unlockedByModuleId[activeModule.id] === true : false;
+  const activeStatus = activeModule
+    ? !isActiveModuleUnlocked
+      ? { label: "Verrouillé", className: "tf-chip" }
+      : activeTab === "lessons"
+        ? {
+            label: isActiveLessonCompleted ? "Terminée" : "À faire",
+            className: isActiveLessonCompleted ? "tf-chip tf-chip--done" : "tf-chip",
+          }
+        : {
+            label: passed === true || passedByModuleId[activeModule.id] === true ? "Terminée" : "À faire",
+            className:
+              passed === true || passedByModuleId[activeModule.id] === true ? "tf-chip tf-chip--done" : "tf-chip",
+          }
+    : null;
 
   function openModule(module: ModuleItem, tab: "lessons" | "quiz" = "lessons", lessonId: string | null = null) {
     if (unlockedByModuleId[module.id] !== true) {
@@ -857,16 +856,21 @@ export default function StatsPage() {
     setQuizSubmitMessage("");
   }
 
+  function collapseAllModules() {
+    setActiveModule(null);
+    setActiveLessonId(null);
+    setActiveTab("lessons");
+    setQuizSubmitMessage("");
+    setShowExpandedContent(false);
+  }
+
   function toggleModule(module: ModuleItem) {
     if (unlockedByModuleId[module.id] !== true) {
       return;
     }
 
     if (activeModule?.id === module.id) {
-      setActiveModule(null);
-      setActiveLessonId(null);
-      setActiveTab("lessons");
-      setQuizSubmitMessage("");
+      collapseAllModules();
       return;
     }
 
@@ -881,12 +885,153 @@ export default function StatsPage() {
     openModule(nextFormationAction.module, "lessons", nextFormationAction.lesson.id);
   }
 
-  function handleOpenQuizAction() {
-    if (!nextQuizAction) {
-      return;
+  function renderActivePanelBody() {
+    if (!activeModule) {
+      return (
+        <div className="empty-state">
+          Choisis un module à gauche ou utilise Start pour ouvrir ta prochaine leçon.
+        </div>
+      );
     }
 
-    openModule(nextQuizAction, "quiz", null);
+    if (!isActiveModuleUnlocked) {
+      return <div className="empty-state">Verrouillé — valide le quiz du module précédent.</div>;
+    }
+
+    if (activeTab === "lessons" && !activeLesson) {
+      return <div className="empty-state">Choisis une leçon dans la liste de gauche.</div>;
+    }
+
+    if (activeTab === "lessons" && activeLesson) {
+      return (
+        <div className="tf-paneStack">
+          <div className="tf-cardHeader">
+            <div>
+              <h4 className="subsection-title tf-title">{activeLesson.title}</h4>
+              <p className="card-meta">
+                {getLessonTypeLabel(activeLesson.content_type)}
+                {activeLesson.duration_min ? ` · ${activeLesson.duration_min} min` : ""}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className={isActiveLessonCompleted ? "tf-btn tf-btn--done" : "tf-btn tf-btn--accent"}
+              onClick={() => void markLessonAsCompleted(activeLesson.id)}
+              disabled={isActiveLessonCompleted || lessonProgressSubmittingId === activeLesson.id}
+            >
+              {isActiveLessonCompleted
+                ? "Leçon terminée"
+                : lessonProgressSubmittingId === activeLesson.id
+                  ? "Enregistrement..."
+                  : "Marquer comme terminée"}
+            </button>
+          </div>
+
+          {lessonProgressMessage && lessonProgressMessage !== "Leçon terminée." && (
+            <p className="card-meta" style={{ color: "#991b1b" }}>
+              {lessonProgressMessage}
+            </p>
+          )}
+
+          {activeLesson.content_type?.toLowerCase() === "video" && (
+            <>
+              {activeLesson.tella_url ? (
+                <div className="modal-video">
+                  <iframe
+                    src={activeLesson.tella_url}
+                    title={activeLesson.title}
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
+                <div className="empty-state">Vidéo indisponible pour cette leçon.</div>
+              )}
+            </>
+          )}
+
+          {activeLesson.content_type?.toLowerCase() === "lecture" && (
+            <>
+              {activeLesson.content_markdown ? (
+                <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
+                  {activeLesson.content_markdown}
+                </p>
+              ) : (
+                <div className="empty-state">Contenu de lecture indisponible pour cette leçon.</div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {quizLoading && <p className="muted">Chargement du quiz...</p>}
+        {!quizLoading && quizError && <div className="error-box">Erreur Supabase: {quizError}</div>}
+        {!quizLoading && !quizError && (quizUnavailable || quizQuestions.length === 0) && <div className="empty-state">Quiz non disponible.</div>}
+
+        {!quizLoading && !quizError && !quizUnavailable && quizQuestions.length > 0 && (
+          <div style={{ display: "grid", gap: 12 }}>
+            {quizQuestions.map((question, questionIndex) => (
+              <div key={question.id} className="card tf-card">
+                <p className="card-meta">Question {questionIndex + 1}</p>
+                <p className="card-text">{question.prompt}</p>
+
+                <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                  {(shuffledChoicesByQuestionId[question.id] ?? question.choices).map((choice) => (
+                    <label key={choice.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <input
+                        type="radio"
+                        name={`question-${question.id}`}
+                        value={choice.id}
+                        checked={selectedAnswers[question.id] === choice.id}
+                        onChange={() => {
+                          setSelectedAnswers((current) => ({ ...current, [question.id]: choice.id }));
+                          if (quizSubmitMessage) {
+                            setQuizSubmitMessage("");
+                          }
+                        }}
+                        disabled={passed === true || quizSubmitting}
+                      />
+                      <span>{choice.label}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {question.explanation && passed === true && (
+                  <p className="card-meta" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
+                    Explication: {question.explanation}
+                  </p>
+                )}
+              </div>
+            ))}
+
+            {passed === true && <div className="empty-state">Quiz réussi.</div>}
+
+            {passed !== true && quizSubmitMessage && (
+              <p className="card-text" style={{ color: "#991b1b", margin: 0 }}>
+                {quizSubmitMessage}
+              </p>
+            )}
+
+            <div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void submitQuiz()}
+                disabled={passed === true || quizSubmitting}
+              >
+                {quizSubmitting ? "Envoi..." : "Soumettre le quiz"}
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   async function markLessonAsCompleted(lessonId: string) {
@@ -1246,21 +1391,13 @@ export default function StatsPage() {
 
           <main className="tf-dashboardMain">
             <div className="tf-topRow">
-              <div className="tf-card tf-card--flat" style={{ padding: 14, display: "grid", gap: 10 }}>
-                <label className="tf-title" htmlFor="dashboard-academie-select">
-                  Académie
-                </label>
-                <select
-                  id="dashboard-academie-select"
-                  className="tf-btn"
-                  defaultValue="academie"
-                  style={{ width: "100%", appearance: "none" }}
-                >
-                  <option value="academie">Académie</option>
-                </select>
-                <p className="tf-subtitle" style={{ margin: 0 }}>
-                  Accompagnement
-                </p>
+              <div className="tf-card tf-card--flat tf-academyCard">
+                <span className="tf-quickIcon" aria-hidden="true">◈</span>
+                <div className="tf-quickText">
+                  <div className="tf-quickTitle">Académie</div>
+                  <div className="tf-quickMeta">Accompagnement</div>
+                </div>
+                <span className="tf-academyCaret" aria-hidden="true">⌄</span>
               </div>
 
               <div className="tf-quickActions">
@@ -1326,15 +1463,20 @@ export default function StatsPage() {
             <div className="tf-contentRow">
               <section className="tf-leftPane tf-card" style={{ padding: 14 }}>
                 <div className="tf-cardHeader" style={{ alignItems: "center" }}>
-                  <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
-                    <button type="button" className="tf-tab isActive">
-                      Tous
-                    </button>
-                    <button type="button" className="tf-tab">
-                      À faire
-                    </button>
-                    <button type="button" className="tf-tab">
-                      Fait
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
+                      <button type="button" className="tf-tab isActive">
+                        Tous
+                      </button>
+                      <button type="button" className="tf-tab">
+                        À faire
+                      </button>
+                      <button type="button" className="tf-tab">
+                        Fait
+                      </button>
+                    </div>
+                    <button type="button" className="tf-actionPill" onClick={collapseAllModules} disabled={!activeModule}>
+                      Replier
                     </button>
                   </div>
                   {badgeLoadError && (
@@ -1365,7 +1507,7 @@ export default function StatsPage() {
                           <div key={module.id} ref={(element) => { moduleRefs.current[module.id] = element; }} className="tf-moduleCard">
                             <button
                               type="button"
-                              className="card-button tf-card"
+                              className="card-button tf-card tf-moduleCardFixed"
                               onClick={() => toggleModule(module)}
                               aria-label={`Ouvrir le module ${module.title}`}
                               aria-expanded={isSelected}
@@ -1379,16 +1521,16 @@ export default function StatsPage() {
                               }
                             >
                               <p className="card-meta">Module {module.order_index}</p>
-                              <h4 className="card-title tf-title">{module.title}</h4>
-                              <p className="card-text clamp-2">{module.description ?? "Aucune description."}</p>
-                              <p className="card-meta" style={{ marginTop: 10 }}>
-                                {lessonCount} leçon(s)
-                              </p>
-                              {!isUnlocked && (
-                                <p className="card-meta" style={{ marginTop: 8, color: "#991b1b" }}>
-                                  Verrouillé — valide le quiz du module précédent
-                                </p>
-                              )}
+                              <h4 className="card-title tf-title tf-clamp2">{module.title}</h4>
+                              <p className="card-text tf-clamp2">{module.description ?? "Aucune description."}</p>
+                              <div className="tf-moduleMeta">
+                                <p className="card-meta">{lessonCount} leçon(s)</p>
+                                {!isUnlocked && (
+                                  <p className="card-meta" style={{ color: "#991b1b" }}>
+                                    Verrouillé — valide le quiz du module précédent
+                                  </p>
+                                )}
+                              </div>
                             </button>
 
                             {isSelected && (
@@ -1466,56 +1608,10 @@ export default function StatsPage() {
               </section>
 
               <section className="tf-centerPane tf-card" style={{ padding: 14 }}>
-                <div className="tf-paneTop">
-                  <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className={`tf-tab${activeTab === "lessons" ? " isActive" : ""}`}
-                      onClick={() => setActiveTab("lessons")}
-                      disabled={!activeModule}
-                    >
-                      Leçons
-                    </button>
-                    <button
-                      type="button"
-                      className={`tf-tab${activeTab === "quiz" ? " isActive" : ""}`}
-                      onClick={() => {
-                        if (activeModule) {
-                          setActiveTab("quiz");
-                        }
-                      }}
-                      disabled={!activeModule}
-                    >
-                      Quiz
-                    </button>
-                  </div>
-                  <div className="tf-paneActions" style={{ flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className="tf-actionPill"
-                      onClick={() => {
-                        setSessionsModalTab("upcoming");
-                        setShowAllSessionsModal(true);
-                      }}
-                    >
-                      Séances
-                    </button>
-                    <button type="button" className="tf-actionPill" onClick={handleOpenQuizAction} disabled={!nextQuizAction}>
-                      Quiz suivant
-                    </button>
-                  </div>
-                </div>
-
                 {quizDataError && <div className="error-box">{quizDataError}</div>}
 
                 <div className="tf-scroll">
                   <div className="tf-paneStack">
-                    {!activeModule && (
-                      <div className="empty-state">
-                        Choisis un module à gauche ou utilise Start pour ouvrir ta prochaine leçon.
-                      </div>
-                    )}
-
                     {activeModule && (
                       <>
                         <div className="tf-contentHeader">
@@ -1524,151 +1620,23 @@ export default function StatsPage() {
                             <h2 className="tf-contentTitle tf-title">{activeModule.title}</h2>
                             {activeModule.description && <p className="tf-contentSubtitle">{activeModule.description}</p>}
                           </div>
-                          {activeTab === "lessons" && activeLesson && (
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end" }}>
-                              <span className={isActiveLessonCompleted ? "tf-chip tf-chip--done" : "tf-chip"}>
-                                {isActiveLessonCompleted ? "Terminée" : "À faire"}
-                              </span>
-                              <button
-                                type="button"
-                                className={isActiveLessonCompleted ? "tf-btn tf-btn--done" : "tf-btn tf-btn--accent"}
-                                onClick={() => void markLessonAsCompleted(activeLesson.id)}
-                                disabled={isActiveLessonCompleted || lessonProgressSubmittingId === activeLesson.id}
-                              >
-                                {isActiveLessonCompleted
-                                  ? "Leçon terminée"
-                                  : lessonProgressSubmittingId === activeLesson.id
-                                    ? "Enregistrement..."
-                                    : "Marquer comme terminée"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        {!isActiveModuleUnlocked && <div className="empty-state">Verrouillé — valide le quiz du module précédent.</div>}
-
-                        {isActiveModuleUnlocked && activeTab === "lessons" && !activeLesson && (
-                          <div className="empty-state">Choisis une leçon dans la liste de gauche.</div>
-                        )}
-
-                        {isActiveModuleUnlocked && activeTab === "lessons" && activeLesson && (
-                          <div className="tf-paneStack">
-                            <div className="tf-cardHeader">
-                              <div>
-                                <h4 className="subsection-title tf-title">{activeLesson.title}</h4>
-                                <p className="card-meta">
-                                  {getLessonTypeLabel(activeLesson.content_type)}
-                                  {activeLesson.duration_min ? ` · ${activeLesson.duration_min} min` : ""}
-                                </p>
-                              </div>
-                            </div>
-
-                            {lessonProgressMessage && lessonProgressMessage !== "Leçon terminée." && (
-                              <p
-                                className="card-meta"
-                                style={{ color: lessonProgressMessage === "Leçon terminée." ? "#166534" : "#991b1b" }}
-                              >
-                                {lessonProgressMessage}
-                              </p>
-                            )}
-
-                            {activeLesson.content_type?.toLowerCase() === "video" && (
-                              <>
-                                {activeLesson.tella_url ? (
-                                  <div className="modal-video">
-                                    <iframe
-                                      src={activeLesson.tella_url}
-                                      title={activeLesson.title}
-                                      allow="autoplay; fullscreen; picture-in-picture"
-                                      allowFullScreen
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="empty-state">Vidéo indisponible pour cette leçon.</div>
-                                )}
-                              </>
-                            )}
-
-                            {activeLesson.content_type?.toLowerCase() === "lecture" && (
-                              <>
-                                {activeLesson.content_markdown ? (
-                                  <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
-                                    {activeLesson.content_markdown}
-                                  </p>
-                                ) : (
-                                  <div className="empty-state">Contenu de lecture indisponible pour cette leçon.</div>
-                                )}
-                              </>
-                            )}
+                          <div className="tf-paneActions">
+                            {activeStatus && <span className={activeStatus.className}>{activeStatus.label}</span>}
+                            <button
+                              type="button"
+                              className="tf-actionPill"
+                              onClick={() => setShowExpandedContent(true)}
+                              aria-label="Ouvrir le contenu en grand"
+                              title="Ouvrir en grand"
+                            >
+                              ⤢
+                            </button>
                           </div>
-                        )}
-
-                        {isActiveModuleUnlocked && activeTab === "quiz" && (
-                          <>
-                            {quizLoading && <p className="muted">Chargement du quiz...</p>}
-                            {!quizLoading && quizError && <div className="error-box">Erreur Supabase: {quizError}</div>}
-                            {!quizLoading && !quizError && (quizUnavailable || quizQuestions.length === 0) && <div className="empty-state">Quiz non disponible.</div>}
-
-                            {!quizLoading && !quizError && !quizUnavailable && quizQuestions.length > 0 && (
-                              <div style={{ display: "grid", gap: 12 }}>
-                                {quizQuestions.map((question, questionIndex) => (
-                                  <div key={question.id} className="card tf-card">
-                                    <p className="card-meta">Question {questionIndex + 1}</p>
-                                    <p className="card-text">{question.prompt}</p>
-
-                                    <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-                                      {(shuffledChoicesByQuestionId[question.id] ?? question.choices).map((choice) => (
-                                        <label key={choice.id} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                                          <input
-                                            type="radio"
-                                            name={`question-${question.id}`}
-                                            value={choice.id}
-                                            checked={selectedAnswers[question.id] === choice.id}
-                                            onChange={() => {
-                                              setSelectedAnswers((current) => ({ ...current, [question.id]: choice.id }));
-                                              if (quizSubmitMessage) {
-                                                setQuizSubmitMessage("");
-                                              }
-                                            }}
-                                            disabled={passed === true || quizSubmitting}
-                                          />
-                                          <span>{choice.label}</span>
-                                        </label>
-                                      ))}
-                                    </div>
-
-                                    {question.explanation && passed === true && (
-                                      <p className="card-meta" style={{ marginTop: 10, whiteSpace: "pre-wrap" }}>
-                                        Explication: {question.explanation}
-                                      </p>
-                                    )}
-                                  </div>
-                                ))}
-
-                                {passed === true && <div className="empty-state">Quiz réussi.</div>}
-
-                                {passed !== true && quizSubmitMessage && (
-                                  <p className="card-text" style={{ color: "#991b1b", margin: 0 }}>
-                                    {quizSubmitMessage}
-                                  </p>
-                                )}
-
-                                <div>
-                                  <button
-                                    type="button"
-                                    className="btn btn-primary"
-                                    onClick={() => void submitQuiz()}
-                                    disabled={passed === true || quizSubmitting}
-                                  >
-                                    {quizSubmitting ? "Envoi..." : "Soumettre le quiz"}
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        )}
+                        </div>
                       </>
                     )}
+
+                    {renderActivePanelBody()}
                   </div>
                 </div>
               </section>
@@ -1677,7 +1645,35 @@ export default function StatsPage() {
         </section>
       )}
 
-        {showBadgesModal && (
+      {showExpandedContent && activeModule && (
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowExpandedContent(false)}>
+          <div
+            className="modal-panel tf-modalPanel tf-card"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(1180px, 100%)", maxHeight: "90vh" }}
+          >
+            <div className="modal-header">
+              <div>
+                <p className="card-meta tf-chip tf-chip--accent">Module</p>
+                <h3 className="modal-title tf-title">{activeModule.title}</h3>
+                {activeModule.description && <p className="tf-contentSubtitle">{activeModule.description}</p>}
+              </div>
+              <div className="tf-paneActions" style={{ alignItems: "center", flexWrap: "wrap" }}>
+                {activeStatus && <span className={activeStatus.className}>{activeStatus.label}</span>}
+                <button type="button" className="btn" onClick={() => setShowExpandedContent(false)}>
+                  Fermer
+                </button>
+              </div>
+            </div>
+
+            <div className="tf-scroll" style={{ maxHeight: "calc(90vh - 180px)" }}>
+              <div className="tf-paneStack">{renderActivePanelBody()}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBadgesModal && (
         <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowBadgesModal(false)}>
           <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
@@ -1702,7 +1698,7 @@ export default function StatsPage() {
         </div>
       )}
 
-        {showAllSessionsModal && (
+      {showAllSessionsModal && (
         <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowAllSessionsModal(false)}>
           <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(860px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
@@ -1771,7 +1767,7 @@ export default function StatsPage() {
         </div>
       )}
 
-        {showAllTasksModal && (
+      {showAllTasksModal && (
         <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowAllTasksModal(false)}>
           <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
