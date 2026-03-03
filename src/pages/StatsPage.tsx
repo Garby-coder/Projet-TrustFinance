@@ -1000,16 +1000,6 @@ export default function StatsPage() {
     if (activeTab === "lessons" && activeLesson) {
       return (
         <div className="tf-paneStack">
-          <div className="tf-cardHeader">
-            <div>
-              <h4 className="subsection-title tf-title">{activeLesson.title}</h4>
-              <p className="card-meta">
-                {getLessonTypeLabel(activeLesson.content_type)}
-                {activeLesson.duration_min ? ` · ${activeLesson.duration_min} min` : ""}
-              </p>
-            </div>
-          </div>
-
           {lessonProgressMessage && lessonProgressMessage !== "Leçon terminée." && (
             <p className="card-meta" style={{ color: "#991b1b" }}>
               {lessonProgressMessage}
@@ -1483,7 +1473,7 @@ export default function StatsPage() {
               <div className="tf-quickActions">
                 <button
                   type="button"
-                  className="card-button tf-card tf-quickCard tf-quickCard--start"
+                  className="card-button tf-card tf-quickCard tf-startCta"
                   onClick={handleOpenFormationAction}
                   disabled={!nextFormationAction}
                 >
@@ -1723,6 +1713,12 @@ export default function StatsPage() {
                           <div className="tf-titleRow">
                             <h2 className="tf-contentTitle tf-title">{activeLesson ? activeLesson.title : (activeModule?.title ?? "")}</h2>
                             <div className="tf-titleActions">
+                              {activeTab === "lessons" && activeLesson && (
+                                <span className="card-meta" style={{ whiteSpace: "nowrap" }}>
+                                  {getLessonTypeLabel(activeLesson.content_type)}
+                                  {activeLesson.duration_min ? ` · ${activeLesson.duration_min} min` : ""}
+                                </span>
+                              )}
                               {canMarkLessonDone && activeLesson ? (
                                 <button
                                   type="button"
