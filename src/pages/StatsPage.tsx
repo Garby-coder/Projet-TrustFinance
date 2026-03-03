@@ -857,6 +857,22 @@ export default function StatsPage() {
     setQuizSubmitMessage("");
   }
 
+  function toggleModule(module: ModuleItem) {
+    if (unlockedByModuleId[module.id] !== true) {
+      return;
+    }
+
+    if (activeModule?.id === module.id) {
+      setActiveModule(null);
+      setActiveLessonId(null);
+      setActiveTab("lessons");
+      setQuizSubmitMessage("");
+      return;
+    }
+
+    openModule(module);
+  }
+
   function handleOpenFormationAction() {
     if (!nextFormationAction) {
       return;
@@ -1350,8 +1366,9 @@ export default function StatsPage() {
                             <button
                               type="button"
                               className="card-button tf-card"
-                              onClick={() => openModule(module)}
+                              onClick={() => toggleModule(module)}
                               aria-label={`Ouvrir le module ${module.title}`}
+                              aria-expanded={isSelected}
                               disabled={!isUnlocked}
                               style={
                                 !isUnlocked
@@ -1375,7 +1392,7 @@ export default function StatsPage() {
                             </button>
 
                             {isSelected && (
-                              <div className="tf-moduleExpand">
+                              <div className="tf-moduleExpand" onClick={(event) => event.stopPropagation()}>
                                 <div className="tf-lessonTree">
                                   {lessonsForModule.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
 
@@ -1392,7 +1409,8 @@ export default function StatsPage() {
                                         <button
                                           type="button"
                                           className="tf-lessonLeft"
-                                          onClick={() => {
+                                          onClick={(event) => {
+                                            event.stopPropagation();
                                             setActiveTab("lessons");
                                             setActiveLessonId(lesson.id);
                                           }}
@@ -1412,7 +1430,8 @@ export default function StatsPage() {
                                         <button
                                           type="button"
                                           className="tf-lessonToggle"
-                                          onClick={() => {
+                                          onClick={(event) => {
+                                            event.stopPropagation();
                                             setActiveTab("lessons");
                                             setActiveLessonId(lesson.id);
                                           }}
@@ -1428,7 +1447,10 @@ export default function StatsPage() {
                                     <button
                                       type="button"
                                       className="tf-quizRow"
-                                      onClick={() => openModule(module, "quiz", null)}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        openModule(module, "quiz", null);
+                                      }}
                                     >
                                       Quiz {passedByModuleId[module.id] === true ? "validé" : "à faire"}
                                     </button>
