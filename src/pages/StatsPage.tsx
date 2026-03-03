@@ -62,6 +62,8 @@ type QuizQuestion = QuizQuestionRow & {
   choices: QuizChoiceRow[];
 };
 
+type ModuleFilter = "all" | "todo" | "done";
+
 function parseDate(dateValue: string | null | undefined) {
   if (!dateValue) {
     return null;
@@ -318,8 +320,10 @@ export default function StatsPage() {
   const [quizRequiredByModuleId, setQuizRequiredByModuleId] = useState<Record<string, boolean>>({});
 
   const [activeModule, setActiveModule] = useState<ModuleItem | null>(null);
+  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"lessons" | "quiz">("lessons");
+  const [moduleFilter, setModuleFilter] = useState<ModuleFilter>("all");
 
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizError, setQuizError] = useState("");
@@ -342,13 +346,13 @@ export default function StatsPage() {
   const didAutoOpen = useRef(false);
 
   useEffect(() => {
-    const selectedModuleId = activeModule?.id;
+    const selectedModuleId = expandedModuleId;
     if (!selectedModuleId) {
       return;
     }
 
     moduleRefs.current[selectedModuleId]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [activeModule?.id]);
+  }, [expandedModuleId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -612,17 +616,57 @@ export default function StatsPage() {
     unlockedByModuleId[currentModule.id] = quizPassedForPrevious;
   }
 
+  const modulesMeta = modulesSorted.map((module) => {
+    const lessonsForModule = moduleLessons
+      .filter((lesson) => lesson.module_id === module.id)
+      .sort((a, b) => a.order_index - b.order_index);
+    const lessonCount = lessonsForModule.length;
+    const doneLessons = lessonsForModule.filter((lesson) => completedByLessonId[lesson.id] === true).length;
+    const progressPct = lessonCount > 0 ? Math.round((doneLessons / lessonCount) * 100) : 0;
+    const isUnlocked = unlockedByModuleId[module.id] === true;
+    const moduleHasQuiz = quizRequiredByModuleId[module.id] === true;
+    const moduleBadgeLabel = !isUnlocked
+      ? "Verrouillé"
+      : progressPct === 100 && lessonCount > 0
+        ? "Terminé"
+        : progressPct > 0
+          ? "En cours"
+          : "À faire";
+    const moduleBadgeClass = !isUnlocked
+      ? "tf-moduleBadge tf-moduleBadge--locked"
+      : progressPct === 100 && lessonCount > 0
+        ? "tf-moduleBadge tf-moduleBadge--done"
+        : "tf-moduleBadge tf-moduleBadge--inprogress";
+    const ringColor = !isUnlocked
+      ? "rgba(255,255,255,.18)"
+      : progressPct === 100 && lessonCount > 0
+        ? "rgba(40,209,124,.85)"
+        : "rgba(175,135,50,.9)";
+
+    return {
+      module,
+      lessonsForModule,
+      lessonCount,
+      doneLessons,
+      progressPct,
+      isUnlocked,
+      moduleHasQuiz,
+      moduleBadgeLabel,
+      moduleBadgeClass,
+      ringColor,
+    };
+  });
+
   const nextFormationAction = (() => {
-    for (const module of modulesSorted) {
-      if (unlockedByModuleId[module.id] !== true) {
+    for (const moduleMeta of modulesMeta) {
+      if (!moduleMeta.isUnlocked) {
         continue;
       }
 
-      const lessons = moduleLessons.filter((lesson) => lesson.module_id === module.id).sort((a, b) => a.order_index - b.order_index);
-      const nextLesson = lessons.find((lesson) => completedByLessonId[lesson.id] !== true);
+      const nextLesson = moduleMeta.lessonsForModule.find((lesson) => completedByLessonId[lesson.id] !== true);
       if (nextLesson) {
         return {
-          module,
+          module: moduleMeta.module,
           lesson: nextLesson,
         };
       }
@@ -630,6 +674,20 @@ export default function StatsPage() {
 
     return null;
   })();
+
+  const currentModuleId =
+    nextFormationAction?.module.id ??
+    modulesMeta.find((moduleMeta) => moduleMeta.isUnlocked && moduleMeta.progressPct < 100)?.module.id ??
+    null;
+
+  const filteredModules =
+    moduleFilter === "done"
+      ? modulesMeta.filter((moduleMeta) => moduleMeta.progressPct === 100)
+      : moduleFilter === "todo"
+        ? currentModuleId
+          ? modulesMeta.filter((moduleMeta) => moduleMeta.module.id === currentModuleId)
+          : []
+        : modulesMeta;
 
   const now = Date.now();
   const upcomingSessionsAll = sessions
@@ -850,6 +908,7 @@ export default function StatsPage() {
 
     const lessons = moduleLessons.filter((item) => item.module_id === module.id).sort((a, b) => a.order_index - b.order_index);
 
+    setExpandedModuleId(module.id);
     setActiveModule(module);
     setActiveLessonId(lessonId ?? lessons[0]?.id ?? null);
     setActiveTab(tab);
@@ -858,11 +917,7 @@ export default function StatsPage() {
   }
 
   function collapseAllModules() {
-    setActiveModule(null);
-    setActiveLessonId(null);
-    setActiveTab("lessons");
-    setQuizSubmitMessage("");
-    setShowExpandedContent(false);
+    setExpandedModuleId(null);
   }
 
   function toggleModule(module: ModuleItem) {
@@ -870,8 +925,13 @@ export default function StatsPage() {
       return;
     }
 
-    if (activeModule?.id === module.id) {
+    if (expandedModuleId === module.id) {
       collapseAllModules();
+      return;
+    }
+
+    if (activeModule?.id === module.id) {
+      setExpandedModuleId(module.id);
       return;
     }
 
@@ -914,6 +974,14 @@ export default function StatsPage() {
 
     didAutoOpen.current = true;
   }, [activeModule, loading, modulesSorted, nextFormationAction, passedByModuleId]);
+
+  useEffect(() => {
+    if (moduleFilter !== "todo" || !currentModuleId || expandedModuleId === currentModuleId) {
+      return;
+    }
+
+    setExpandedModuleId(currentModuleId);
+  }, [currentModuleId, expandedModuleId, moduleFilter]);
 
   function renderActivePanelBody() {
     if (!activeModule) {
@@ -1495,17 +1563,29 @@ export default function StatsPage() {
                 <div className="tf-cardHeader" style={{ alignItems: "center" }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
-                      <button type="button" className="tf-tab isActive">
+                      <button
+                        type="button"
+                        className={`tf-tab${moduleFilter === "all" ? " isActive" : ""}`}
+                        onClick={() => setModuleFilter("all")}
+                      >
                         Tous
                       </button>
-                      <button type="button" className="tf-tab">
+                      <button
+                        type="button"
+                        className={`tf-tab${moduleFilter === "todo" ? " isActive" : ""}`}
+                        onClick={() => setModuleFilter("todo")}
+                      >
                         À faire
                       </button>
-                      <button type="button" className="tf-tab">
+                      <button
+                        type="button"
+                        className={`tf-tab${moduleFilter === "done" ? " isActive" : ""}`}
+                        onClick={() => setModuleFilter("done")}
+                      >
                         Fait
                       </button>
                     </div>
-                    <button type="button" className="tf-actionPill" onClick={collapseAllModules} disabled={!activeModule}>
+                    <button type="button" className="tf-actionPill" onClick={collapseAllModules} disabled={!expandedModuleId}>
                       Replier
                     </button>
                   </div>
@@ -1520,37 +1600,32 @@ export default function StatsPage() {
 
                 <div className="tf-scroll">
                   <div className="tf-paneStack">
-                    {!formationError && modules.length === 0 && <div className="empty-state">Aucun module disponible.</div>}
+                    {!formationError && modulesMeta.length === 0 && <div className="empty-state">Aucun module disponible.</div>}
+
+                    {!formationError && modulesMeta.length > 0 && filteredModules.length === 0 && (
+                      <div className="empty-state">
+                        {moduleFilter === "done"
+                          ? "Aucun module terminé."
+                          : moduleFilter === "todo"
+                            ? "Aucun module à faire."
+                            : "Aucun module disponible."}
+                      </div>
+                    )}
 
                     {!formationError &&
-                      modules.length > 0 &&
-                      modulesSorted.map((module) => {
-                        const isUnlocked = unlockedByModuleId[module.id] === true;
-                        const lessonsForModule = moduleLessons
-                          .filter((lesson) => lesson.module_id === module.id)
-                          .sort((a, b) => a.order_index - b.order_index);
-                        const lessonCount = lessonsForModule.length;
-                        const doneLessons = lessonsForModule.filter((lesson) => completedByLessonId[lesson.id] === true).length;
-                        const progressPct = lessonCount > 0 ? Math.round((doneLessons / lessonCount) * 100) : 0;
-                        const isSelected = activeModule?.id === module.id;
-                        const moduleHasQuiz = quizRequiredByModuleId[module.id] === true;
-                        const moduleBadgeLabel = !isUnlocked
-                          ? "Verrouillé"
-                          : progressPct === 100 && lessonCount > 0
-                            ? "Terminé"
-                            : progressPct > 0
-                              ? "En cours"
-                              : "À faire";
-                        const moduleBadgeClass = !isUnlocked
-                          ? "tf-moduleBadge tf-moduleBadge--locked"
-                          : progressPct === 100 && lessonCount > 0
-                            ? "tf-moduleBadge tf-moduleBadge--done"
-                            : "tf-moduleBadge tf-moduleBadge--inprogress";
-                        const ringColor = !isUnlocked
-                          ? "rgba(255,255,255,.18)"
-                          : progressPct === 100 && lessonCount > 0
-                            ? "rgba(40,209,124,.85)"
-                            : "rgba(175,135,50,.9)";
+                      filteredModules.length > 0 &&
+                      filteredModules.map((moduleMeta) => {
+                        const {
+                          module,
+                          lessonsForModule,
+                          progressPct,
+                          isUnlocked,
+                          moduleHasQuiz,
+                          moduleBadgeLabel,
+                          moduleBadgeClass,
+                          ringColor,
+                        } = moduleMeta;
+                        const isSelected = expandedModuleId === module.id;
 
                         return (
                           <div key={module.id} ref={(element) => { moduleRefs.current[module.id] = element; }} className="tf-moduleCard">

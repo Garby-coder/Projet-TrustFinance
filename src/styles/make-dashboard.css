@@ -339,14 +339,16 @@
 }
 
 .tf-moduleBadge {
-  height: 28px;
-  padding: 0 12px;
+  height: 22px;
+  padding: 0 10px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 650;
-  font-size: 13px;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.2px;
 }
 
 .tf-moduleBadge--done {
