@@ -1721,7 +1721,7 @@ export default function StatsPage() {
                       <>
                         <div className="tf-contentHeader">
                           <div className="tf-titleRow">
-                            <h2 className="tf-contentTitle tf-title">{activeModule.title}</h2>
+                            <h2 className="tf-contentTitle tf-title">{activeLesson ? activeLesson.title : (activeModule?.title ?? "")}</h2>
                             <div className="tf-titleActions">
                               {canMarkLessonDone && activeLesson ? (
                                 <button

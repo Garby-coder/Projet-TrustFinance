@@ -139,8 +139,8 @@
 }
 
 .tf-quickCard--start {
-  background: rgba(175, 135, 50, 0.22);
-  border-color: rgba(175, 135, 50, 0.4);
+  background: linear-gradient(135deg, rgba(175, 135, 50, 0.3) 0%, rgba(108, 81, 28, 0.46) 55%, rgba(72, 54, 19, 0.62) 100%);
+  border-color: rgba(175, 135, 50, 0.55);
 }
 
 .tf-quickText,
