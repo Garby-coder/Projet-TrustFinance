@@ -884,6 +884,8 @@ export default function StatsPage() {
     ? moduleLessons.filter((lesson) => lesson.module_id === activeModule.id).sort((a, b) => a.order_index - b.order_index)
     : [];
   const activeLesson = activeModuleLessons.find((lesson) => lesson.id === activeLessonId) ?? activeModuleLessons[0] ?? null;
+  const activeLessonModuleId =
+    moduleLessons.find((lesson) => lesson.id === activeLessonId)?.module_id ?? activeModule?.id ?? null;
   const isActiveLessonCompleted = activeLesson ? completedByLessonId[activeLesson.id] === true : false;
   const isActiveModuleUnlocked = activeModule ? unlockedByModuleId[activeModule.id] === true : false;
   const activeStatus = activeModule
@@ -931,12 +933,7 @@ export default function StatsPage() {
       return;
     }
 
-    if (activeModule?.id === module.id) {
-      setExpandedModuleId(module.id);
-      return;
-    }
-
-    openModule(module);
+    setExpandedModuleId(module.id);
   }
 
   function handleOpenFormationAction() {
@@ -1625,7 +1622,7 @@ export default function StatsPage() {
                           <div key={module.id} ref={(element) => { moduleRefs.current[module.id] = element; }} className="tf-moduleCard">
                             <button
                               type="button"
-                              className="card-button tf-card tf-moduleCardFixed"
+                              className={`card-button tf-card tf-moduleCardFixed${module.id === activeLessonModuleId ? " tf-moduleCard--active" : ""}`}
                               onClick={() => toggleModule(module)}
                               aria-label={`Ouvrir le module ${module.title}`}
                               aria-expanded={isSelected}
@@ -1673,8 +1670,7 @@ export default function StatsPage() {
                                           className="tf-lessonLeft"
                                           onClick={(event) => {
                                             event.stopPropagation();
-                                            setActiveTab("lessons");
-                                            setActiveLessonId(lesson.id);
+                                            openModule(module, "lessons", lesson.id);
                                           }}
                                           aria-label={`Ouvrir la leçon ${lesson.title}`}
                                         >
@@ -1694,8 +1690,7 @@ export default function StatsPage() {
                                           className="tf-lessonToggle"
                                           onClick={(event) => {
                                             event.stopPropagation();
-                                            setActiveTab("lessons");
-                                            setActiveLessonId(lesson.id);
+                                            openModule(module, "lessons", lesson.id);
                                           }}
                                           aria-label={isCompleted ? `Leçon ${lesson.title} terminée` : `Ouvrir la leçon ${lesson.title}`}
                                         >

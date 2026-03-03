@@ -290,6 +290,11 @@
   height: 104px;
 }
 
+.tf-moduleCard--active {
+  border: 2px solid rgba(175, 135, 50, 0.75);
+  box-shadow: 0 0 0 1px rgba(175, 135, 50, 0.15), 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
 .tf-moduleTop {
   display: flex;
   align-items: center;
