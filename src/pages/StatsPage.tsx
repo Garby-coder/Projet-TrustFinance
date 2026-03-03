@@ -339,6 +339,7 @@ export default function StatsPage() {
   const [showBadgesModal, setShowBadgesModal] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(false);
   const moduleRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const didAutoOpen = useRef(false);
 
   useEffect(() => {
     const selectedModuleId = activeModule?.id;
@@ -884,6 +885,35 @@ export default function StatsPage() {
 
     openModule(nextFormationAction.module, "lessons", nextFormationAction.lesson.id);
   }
+
+  useEffect(() => {
+    if (didAutoOpen.current) {
+      return;
+    }
+
+    if (loading || modulesSorted.length === 0) {
+      return;
+    }
+
+    if (activeModule) {
+      didAutoOpen.current = true;
+      return;
+    }
+
+    const targetModule =
+      nextFormationAction?.module ??
+      modulesSorted.find(
+        (module) => unlockedByModuleId[module.id] === true && passedByModuleId[module.id] !== true
+      ) ??
+      modulesSorted.find((module) => unlockedByModuleId[module.id] === true) ??
+      null;
+
+    if (targetModule) {
+      openModule(targetModule, "lessons", nextFormationAction?.module.id === targetModule.id ? nextFormationAction.lesson.id : null);
+    }
+
+    didAutoOpen.current = true;
+  }, [activeModule, loading, modulesSorted, nextFormationAction, passedByModuleId]);
 
   function renderActivePanelBody() {
     if (!activeModule) {
@@ -1615,23 +1645,22 @@ export default function StatsPage() {
                     {activeModule && (
                       <>
                         <div className="tf-contentHeader">
-                          <div>
-                            <p className="card-meta tf-chip tf-chip--accent">Module</p>
+                          <div className="tf-titleRow">
                             <h2 className="tf-contentTitle tf-title">{activeModule.title}</h2>
-                            {activeModule.description && <p className="tf-contentSubtitle">{activeModule.description}</p>}
+                            <div className="tf-titleActions">
+                              {activeStatus && <span className={activeStatus.className}>{activeStatus.label}</span>}
+                              <button
+                                type="button"
+                                className="tf-actionPill"
+                                onClick={() => setShowExpandedContent(true)}
+                                aria-label="Ouvrir le contenu en grand"
+                                title="Ouvrir en grand"
+                              >
+                                ⤢
+                              </button>
+                            </div>
                           </div>
-                          <div className="tf-paneActions">
-                            {activeStatus && <span className={activeStatus.className}>{activeStatus.label}</span>}
-                            <button
-                              type="button"
-                              className="tf-actionPill"
-                              onClick={() => setShowExpandedContent(true)}
-                              aria-label="Ouvrir le contenu en grand"
-                              title="Ouvrir en grand"
-                            >
-                              ⤢
-                            </button>
-                          </div>
+                          {activeModule.description && <p className="tf-contentSubtitle">{activeModule.description}</p>}
                         </div>
                       </>
                     )}
