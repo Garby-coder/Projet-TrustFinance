@@ -1612,6 +1612,14 @@ export default function StatsPage() {
                           ringColor,
                         } = moduleMeta;
                         const isSelected = expandedModuleId === module.id;
+                        const quizState =
+                          passedByModuleId[module.id] === true
+                            ? "passed"
+                            : activeModule?.id === module.id &&
+                                activeTab === "quiz" &&
+                                quizSubmitMessage === "Certaines réponses sont incorrectes. Réessaie."
+                              ? "failed"
+                              : "todo";
 
                         return (
                           <div key={module.id} ref={(element) => { moduleRefs.current[module.id] = element; }} className="tf-moduleCard">
@@ -1700,13 +1708,13 @@ export default function StatsPage() {
                                   {moduleHasQuiz && (
                                     <button
                                       type="button"
-                                      className="tf-quizRow"
+                                      className={`tf-quizRow${quizState === "passed" ? " tf-quizRow--passed" : ""}${quizState === "failed" ? " tf-quizRow--failed" : ""}`}
                                       onClick={(event) => {
                                         event.stopPropagation();
                                         openModule(module, "quiz", null);
                                       }}
                                     >
-                                      Quiz {passedByModuleId[module.id] === true ? "validé" : "à faire"}
+                                      {quizState === "passed" ? "Quiz validé" : quizState === "failed" ? "Quiz échoué" : "Quiz à faire"}
                                     </button>
                                   )}
                                 </div>

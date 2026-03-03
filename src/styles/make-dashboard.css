@@ -519,6 +519,18 @@
   color: var(--text);
 }
 
+.tf-quizRow--passed {
+  background: rgba(40, 209, 124, 0.16);
+  border: 1px solid rgba(40, 209, 124, 0.45);
+  color: rgba(220, 255, 238, 0.95);
+}
+
+.tf-quizRow--failed {
+  background: rgba(255, 72, 72, 0.14);
+  border: 1px solid rgba(255, 72, 72, 0.45);
+  color: rgba(255, 220, 220, 0.95);
+}
+
 .tf-contentHeader {
   display: grid;
   gap: 8px;
