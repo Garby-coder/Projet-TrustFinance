@@ -6,6 +6,7 @@ import "./styles/make-dashboard.css";
 import ProtectedLayout from "./components/ProtectedLayout";
 import { supabase } from "./lib/supabase";
 import { ensureDefaultsForUser } from "./lib/bootstrap";
+import { registerEngagementAction } from "./lib/engagement";
 
 import Login from "./pages/Login";
 import StatsPage from "./pages/StatsPage";
@@ -56,6 +57,14 @@ function isMissingUserEngagementTable(error: unknown) {
   return err.code === "42P01" || message.includes("relation") && message.includes("user_engagement") && message.includes("does not exist");
 }
 
+function getLocalDateKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [isAuthed, setIsAuthed] = useState(false);
@@ -83,6 +92,31 @@ export default function App() {
     }
 
     return result.data as UserEngagement | null;
+  }
+
+  async function trackDailyLogin(currentUserId: string) {
+    try {
+      const dateKey = getLocalDateKey();
+      const localStorageKey = `tf_login_logged:${currentUserId}:${dateKey}`;
+
+      if (window.localStorage.getItem(localStorageKey)) {
+        return;
+      }
+
+      const result = await registerEngagementAction({
+        userId: currentUserId,
+        eventKey: `login:${dateKey}`,
+        xpGain: 0,
+      });
+
+      if (result.applied) {
+        window.dispatchEvent(new CustomEvent("tf:engagement", { detail: result }));
+      }
+
+      window.localStorage.setItem(localStorageKey, "1");
+    } catch {
+      // Ne pas bloquer l'app si le tracking échoue.
+    }
   }
 
   // 1) Suivre la session auth
@@ -147,6 +181,7 @@ export default function App() {
 
       try {
         await ensureDefaultsForUser(userId);
+        await trackDailyLogin(userId);
       } catch {
         // optionnel: console.error(e)
       } finally {

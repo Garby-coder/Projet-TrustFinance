@@ -44,6 +44,13 @@ function formatDate(dateValue: string | null) {
   }).format(new Date(timestamp));
 }
 
+function getLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function sortWithNullDatesLastAscending(a: SessionItem, b: SessionItem) {
   const timeA = parseDate(a.scheduled_at);
   const timeB = parseDate(b.scheduled_at);
@@ -321,6 +328,46 @@ export default function SeancesPage() {
     setActiveSession(null);
   }
 
+  function handleFreeBookingClick() {
+    const dateKey = getLocalDateKey(new Date());
+
+    void (async () => {
+      try {
+        let currentUserId = userId;
+
+        if (!currentUserId) {
+          const { data, error: userError } = await supabase.auth.getUser();
+          if (userError) {
+            return;
+          }
+
+          currentUserId = data.user?.id ?? null;
+        }
+
+        if (!currentUserId) {
+          return;
+        }
+
+        const result = await registerEngagementAction({
+          userId: currentUserId,
+          eventKey: `booking_free_clicked:${dateKey}`,
+          xpGain: 0,
+        });
+
+        if (result.applied) {
+          window.dispatchEvent(new CustomEvent("tf:engagement", { detail: result }));
+        }
+      } catch {
+        // Ne bloque jamais la réservation si le tracking échoue.
+      }
+    })();
+
+    const openedWindow = window.open(CALENDLY_FREE_URL, "_blank", "noopener,noreferrer");
+    if (openedWindow) {
+      openedWindow.opener = null;
+    }
+  }
+
   return (
     <section>
       <h2 className="section-title">Mes séances</h2>
@@ -389,9 +436,9 @@ export default function SeancesPage() {
             <div className="card free-session-card">
               <h4 className="card-title">Séance libre (sujet au choix)</h4>
               <p className="card-text">Réservez un créneau libre pour traiter votre besoin du moment.</p>
-              <a href={CALENDLY_FREE_URL} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+              <button type="button" className="btn btn-primary card-action" onClick={handleFreeBookingClick}>
                 Réserver
-              </a>
+              </button>
             </div>
 
             <TasksWidget />
