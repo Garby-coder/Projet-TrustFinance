@@ -290,10 +290,87 @@
   height: 132px;
 }
 
+.tf-moduleTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tf-moduleTitle {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+}
+
 .tf-moduleMeta {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tf-moduleRing {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
   display: grid;
-  gap: 6px;
-  margin-top: auto;
+  place-items: center;
+  position: relative;
+  flex-shrink: 0;
+  font-weight: 800;
+}
+
+.tf-moduleRing::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 999px;
+  background: var(--card);
+}
+
+.tf-moduleRing span {
+  position: relative;
+  z-index: 1;
+  font-size: 13px;
+}
+
+.tf-moduleBadge {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+  font-size: 13px;
+}
+
+.tf-moduleBadge--done {
+  background: rgba(40, 209, 124, 0.14);
+  border: 1px solid rgba(40, 209, 124, 0.35);
+  color: rgba(210, 255, 235, 0.95);
+}
+
+.tf-moduleBadge--inprogress {
+  background: rgba(175, 135, 50, 0.12);
+  border: 1px solid rgba(175, 135, 50, 0.35);
+  color: rgba(255, 235, 205, 0.95);
+}
+
+.tf-moduleBadge--locked {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.tf-moduleBadge--locked,
+.tf-moduleBadge--done,
+.tf-moduleBadge--inprogress {
+  white-space: nowrap;
 }
 
 .tf-clamp2 {
@@ -554,14 +631,15 @@
 
 .tf-app .card-button.tf-moduleCardFixed {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: start;
 }
 
 .tf-app .tf-moduleCardFixed .card-meta,
 .tf-app .tf-moduleCardFixed .card-text,
-.tf-app .tf-moduleCardFixed .card-title {
+.tf-app .tf-moduleCardFixed .card-title,
+.tf-app .tf-moduleCardFixed .tf-moduleTitle {
   margin: 0;
 }
 

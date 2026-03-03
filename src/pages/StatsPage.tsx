@@ -1530,8 +1530,27 @@ export default function StatsPage() {
                           .filter((lesson) => lesson.module_id === module.id)
                           .sort((a, b) => a.order_index - b.order_index);
                         const lessonCount = lessonsForModule.length;
+                        const doneLessons = lessonsForModule.filter((lesson) => completedByLessonId[lesson.id] === true).length;
+                        const progressPct = lessonCount > 0 ? Math.round((doneLessons / lessonCount) * 100) : 0;
                         const isSelected = activeModule?.id === module.id;
                         const moduleHasQuiz = quizRequiredByModuleId[module.id] === true;
+                        const moduleBadgeLabel = !isUnlocked
+                          ? "Verrouillé"
+                          : progressPct === 100 && lessonCount > 0
+                            ? "Terminé"
+                            : progressPct > 0
+                              ? "En cours"
+                              : "À faire";
+                        const moduleBadgeClass = !isUnlocked
+                          ? "tf-moduleBadge tf-moduleBadge--locked"
+                          : progressPct === 100 && lessonCount > 0
+                            ? "tf-moduleBadge tf-moduleBadge--done"
+                            : "tf-moduleBadge tf-moduleBadge--inprogress";
+                        const ringColor = !isUnlocked
+                          ? "rgba(255,255,255,.18)"
+                          : progressPct === 100 && lessonCount > 0
+                            ? "rgba(40,209,124,.85)"
+                            : "rgba(175,135,50,.9)";
 
                         return (
                           <div key={module.id} ref={(element) => { moduleRefs.current[module.id] = element; }} className="tf-moduleCard">
@@ -1550,16 +1569,18 @@ export default function StatsPage() {
                                     : undefined
                               }
                             >
-                              <p className="card-meta">Module {module.order_index}</p>
-                              <h4 className="card-title tf-title tf-clamp2">{module.title}</h4>
-                              <p className="card-text tf-clamp2">{module.description ?? "Aucune description."}</p>
+                              <div className="tf-moduleTop">
+                                <h4 className="tf-moduleTitle tf-clamp2">{module.title}</h4>
+                                <div
+                                  className="tf-moduleRing"
+                                  aria-label={`Progression ${progressPct}%`}
+                                  style={{ background: `conic-gradient(${ringColor} ${progressPct}%, rgba(255,255,255,.10) 0)` }}
+                                >
+                                  <span>{progressPct}%</span>
+                                </div>
+                              </div>
                               <div className="tf-moduleMeta">
-                                <p className="card-meta">{lessonCount} leçon(s)</p>
-                                {!isUnlocked && (
-                                  <p className="card-meta" style={{ color: "#991b1b" }}>
-                                    Verrouillé — valide le quiz du module précédent
-                                  </p>
-                                )}
+                                <span className={moduleBadgeClass}>{moduleBadgeLabel}</span>
                               </div>
                             </button>
 
