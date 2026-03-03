@@ -1541,7 +1541,7 @@ export default function StatsPage() {
             </div>
 
             <div className="tf-contentRow">
-              <section className="tf-leftPane tf-card" style={{ padding: 14 }}>
+              <section className="tf-leftPane" style={{ padding: 14 }}>
                 <div className="tf-cardHeader" style={{ alignItems: "center" }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
