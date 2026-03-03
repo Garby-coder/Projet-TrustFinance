@@ -40,6 +40,8 @@ type TaskItem = {
   due_date: string | null;
   est_minutes: number | null;
   status: string | null;
+  description?: string | null;
+  proof?: string | null;
   updated_at?: string | null;
 };
 
@@ -77,21 +79,6 @@ function parseDate(dateValue: string | null | undefined) {
   return timestamp;
 }
 
-function formatDueDate(dueDate: string | null) {
-  if (!dueDate) {
-    return "Sans échéance";
-  }
-
-  const timestamp = Date.parse(dueDate);
-  if (Number.isNaN(timestamp)) {
-    return "Sans échéance";
-  }
-
-  return new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "medium",
-  }).format(new Date(timestamp));
-}
-
 function formatDate(dateValue: string | null | undefined) {
   const timestamp = parseDate(dateValue);
   if (timestamp === null) {
@@ -105,57 +92,63 @@ function formatDate(dateValue: string | null | undefined) {
 }
 
 function isDoneTask(task: TaskItem) {
-  return task.status?.toLowerCase() === "done";
+  const normalized = task.status?.toLowerCase();
+  return normalized === "done" || normalized === "completed";
 }
 
-function getPriorityLabel(priority: string | null) {
-  const normalized = priority?.toLowerCase();
+function normalizeTaskPriority(priority: string | null | undefined) {
+  const normalized = priority?.trim().toLowerCase();
+
+  if (normalized === "high" || normalized === "haute") {
+    return "high";
+  }
+  if (normalized === "medium" || normalized === "moyenne") {
+    return "medium";
+  }
+  if (normalized === "low" || normalized === "basse") {
+    return "low";
+  }
+
+  return "low";
+}
+
+function getTaskPriorityLabel(priority: string | null | undefined) {
+  const normalized = normalizeTaskPriority(priority);
 
   if (normalized === "high") {
-    return "Priorité haute";
+    return "Haute";
   }
   if (normalized === "medium") {
-    return "Priorité moyenne";
-  }
-  if (normalized === "low") {
-    return "Priorité basse";
+    return "Moyenne";
   }
 
-  return "Priorité non définie";
+  return "Basse";
 }
 
-function compareDueDateAscNullsLast(aDate: string | null, bDate: string | null) {
-  const a = parseDate(aDate);
-  const b = parseDate(bDate);
+function getTaskPriorityRank(priority: string | null | undefined) {
+  const normalized = normalizeTaskPriority(priority);
 
-  if (a === null && b === null) {
+  if (normalized === "high") {
     return 0;
   }
-  if (a === null) {
+  if (normalized === "medium") {
     return 1;
   }
-  if (b === null) {
-    return -1;
-  }
 
-  return a - b;
+  return 2;
 }
 
-function compareDueDateDescNullsLast(aDate: string | null, bDate: string | null) {
-  const a = parseDate(aDate);
-  const b = parseDate(bDate);
+function getTaskPriorityClass(priority: string | null | undefined) {
+  const normalized = normalizeTaskPriority(priority);
 
-  if (a === null && b === null) {
-    return 0;
+  if (normalized === "high") {
+    return "tf-taskPriority tf-taskPriority--high";
   }
-  if (a === null) {
-    return 1;
-  }
-  if (b === null) {
-    return -1;
+  if (normalized === "medium") {
+    return "tf-taskPriority tf-taskPriority--medium";
   }
 
-  return b - a;
+  return "tf-taskPriority tf-taskPriority--low";
 }
 
 function toLocalDateKey(date: Date) {
@@ -340,6 +333,8 @@ export default function StatsPage() {
   const [sessionsModalTab, setSessionsModalTab] = useState<"upcoming" | "past">("upcoming");
   const [showAllTasksModal, setShowAllTasksModal] = useState(false);
   const [tasksModalTab, setTasksModalTab] = useState<"todo" | "done">("todo");
+  const [tasksModalError, setTasksModalError] = useState("");
+  const [taskTogglePendingId, setTaskTogglePendingId] = useState<string | null>(null);
   const [showBadgesModal, setShowBadgesModal] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(false);
   const moduleRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -554,23 +549,49 @@ export default function StatsPage() {
         setSessions(normalizedSessions);
       }
 
-      const tasksSelectWithUpdatedAt = "id,title,priority,due_date,est_minutes,status,updated_at";
-      const tasksSelectFallback = "id,title,priority,due_date,est_minutes,status";
-
       let tasksData: TaskItem[] | null = null;
       let tasksError: { code?: string; message: string } | null = null;
+      const tasksSelectAttempts: Array<{ select: string; defaults: Partial<TaskItem> }> = [
+        {
+          select: "id,title,priority,due_date,est_minutes,status,updated_at,description,proof",
+          defaults: {},
+        },
+        {
+          select: "id,title,priority,due_date,est_minutes,status,description,proof",
+          defaults: { updated_at: null },
+        },
+        {
+          select: "id,title,priority,due_date,est_minutes,status,updated_at",
+          defaults: { description: null, proof: null },
+        },
+        {
+          select: "id,title,priority,due_date,est_minutes,status",
+          defaults: { updated_at: null, description: null, proof: null },
+        },
+      ];
 
-      const tasksWithUpdatedAt = await supabase.from("tasks").select(tasksSelectWithUpdatedAt);
-      if (tasksWithUpdatedAt.error) {
-        if (tasksWithUpdatedAt.error.message.toLowerCase().includes("updated_at")) {
-          const fallbackTasks = await supabase.from("tasks").select(tasksSelectFallback);
-          tasksData = ((fallbackTasks.data ?? []) as TaskItem[]).map((task) => ({ ...task, updated_at: null }));
-          tasksError = fallbackTasks.error;
-        } else {
-          tasksError = tasksWithUpdatedAt.error;
+      for (const attempt of tasksSelectAttempts) {
+        const result = await supabase.from("tasks").select(attempt.select);
+
+        if (!result.error) {
+          tasksData = ((result.data ?? []) as unknown as TaskItem[]).map((task) => ({
+            ...attempt.defaults,
+            ...task,
+          }));
+          tasksError = null;
+          break;
         }
-      } else {
-        tasksData = (tasksWithUpdatedAt.data ?? []) as TaskItem[];
+
+        const message = result.error.message.toLowerCase();
+        const isMissingOptionalColumn =
+          message.includes("updated_at") || message.includes("description") || message.includes("proof");
+
+        if (!isMissingOptionalColumn) {
+          tasksError = result.error;
+          break;
+        }
+
+        tasksError = result.error;
       }
 
       if (!isMounted) {
@@ -736,9 +757,9 @@ export default function StatsPage() {
   const todoTasks = tasks
     .filter((task) => !isDoneTask(task))
     .sort((a, b) => {
-      const dueDateDiff = compareDueDateAscNullsLast(a.due_date, b.due_date);
-      if (dueDateDiff !== 0) {
-        return dueDateDiff;
+      const priorityDiff = getTaskPriorityRank(a.priority) - getTaskPriorityRank(b.priority);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
       }
       return a.title.localeCompare(b.title, "fr");
     });
@@ -761,13 +782,14 @@ export default function StatsPage() {
         }
       }
 
-      const dueDateDiff = compareDueDateDescNullsLast(a.due_date, b.due_date);
-      if (dueDateDiff !== 0) {
-        return dueDateDiff;
+      const priorityDiff = getTaskPriorityRank(a.priority) - getTaskPriorityRank(b.priority);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
       }
 
       return a.title.localeCompare(b.title, "fr");
     });
+  const visibleTasks = tasksModalTab === "todo" ? todoTasks : doneTasks;
 
   const lessonsDoneCount = Object.keys(completedByLessonId).length;
   const quizPassedCount = Object.values(passedByModuleId).filter((value) => value === true).length;
@@ -941,6 +963,38 @@ export default function StatsPage() {
     }
 
     openModule(nextFormationAction.module, "lessons", nextFormationAction.lesson.id);
+  }
+
+  async function toggleTaskStatus(task: TaskItem) {
+    if (taskTogglePendingId === task.id) {
+      return;
+    }
+
+    const previousTask = { ...task };
+    const nextStatus = isDoneTask(task) ? "todo" : "done";
+
+    setTasksModalError("");
+    setTaskTogglePendingId(task.id);
+    setTasks((current) =>
+      current.map((item) =>
+        item.id === task.id
+          ? {
+              ...item,
+              status: nextStatus,
+              updated_at: new Date().toISOString(),
+            }
+          : item
+      )
+    );
+
+    const { error: updateError } = await supabase.from("tasks").update({ status: nextStatus }).eq("id", task.id);
+
+    if (updateError) {
+      setTasks((current) => current.map((item) => (item.id === task.id ? previousTask : item)));
+      setTasksModalError(`Impossible de mettre à jour la tâche : ${updateError.message}`);
+    }
+
+    setTaskTogglePendingId((current) => (current === task.id ? null : current));
   }
 
   useEffect(() => {
@@ -1487,6 +1541,7 @@ export default function StatsPage() {
                   type="button"
                   className="card-button tf-card tf-quickCard"
                   onClick={() => {
+                    setTasksModalError("");
                     setTasksModalTab("todo");
                     setShowAllTasksModal(true);
                   }}
@@ -1883,52 +1938,74 @@ export default function StatsPage() {
           <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
             <div className="modal-header">
               <div>
-                <h3 className="modal-title tf-title">Toutes les tâches</h3>
+                <h3 className="modal-title tf-title">Mes tâches</h3>
               </div>
-              <button type="button" className="btn" onClick={() => setShowAllTasksModal(false)}>
-                Fermer
+              <button type="button" className="btn" aria-label="Fermer" onClick={() => setShowAllTasksModal(false)}>
+                ×
               </button>
             </div>
 
-            <div role="tablist" aria-label="Filtre des tâches" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <div className="tf-tasksTabs" role="tablist" aria-label="Filtre des tâches">
               <button
                 type="button"
-                className="btn"
+                className={`tf-tasksTab${tasksModalTab === "todo" ? " tf-tasksTab--active" : ""}`}
                 onClick={() => setTasksModalTab("todo")}
                 aria-pressed={tasksModalTab === "todo"}
-                style={tasksModalTab === "todo" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
               >
-                À faire
+                À faire ({todoTasks.length})
               </button>
               <button
                 type="button"
-                className="btn"
+                className={`tf-tasksTab${tasksModalTab === "done" ? " tf-tasksTab--active" : ""}`}
                 onClick={() => setTasksModalTab("done")}
                 aria-pressed={tasksModalTab === "done"}
-                style={tasksModalTab === "done" ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
               >
-                Terminées
+                Terminées ({doneTasks.length})
               </button>
             </div>
 
             {tasksLoadError && <div className="error-box">{tasksLoadError}</div>}
+            {!tasksLoadError && tasksModalError && <div className="error-box">{tasksModalError}</div>}
 
             {!tasksLoadError && (
               <div className="tf-scroll" style={{ display: "grid", gap: 8, maxHeight: "65vh" }}>
-                {(tasksModalTab === "todo" ? todoTasks : doneTasks).map((task) => (
-                  <article key={task.id} className="card tf-card">
-                    <p className="card-meta">
-                      Échéance: {formatDueDate(task.due_date)}
-                      {task.est_minutes ? ` · ${task.est_minutes} min` : ""}
-                    </p>
-                    <h4 className="card-title tf-title">{task.title}</h4>
-                    <p className="card-text">
-                      {tasksModalTab === "todo" ? getPriorityLabel(task.priority) : "Terminée"}
-                    </p>
-                  </article>
-                ))}
+                {visibleTasks.map((task) => {
+                  const taskDescription = task.description ?? task.proof ?? "";
+                  const isCompleted = isDoneTask(task);
 
-                {(tasksModalTab === "todo" ? todoTasks : doneTasks).length === 0 && (
+                  return (
+                    <article key={task.id} className="tf-taskItem">
+                      <button
+                        type="button"
+                        className={`tf-taskCheckbox${isCompleted ? " isChecked" : ""}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void toggleTaskStatus(task);
+                        }}
+                        aria-label={isCompleted ? `Marquer ${task.title} comme à faire` : `Marquer ${task.title} comme terminée`}
+                        aria-pressed={isCompleted}
+                        disabled={taskTogglePendingId === task.id}
+                      >
+                        {isCompleted ? "✓" : ""}
+                      </button>
+
+                      <div style={{ minWidth: 0, display: "grid", gap: 6, flex: 1 }}>
+                        <h4 className="card-title tf-title" style={{ fontSize: 18 }}>
+                          {task.title}
+                        </h4>
+                        {taskDescription && (
+                          <p className="card-text" style={{ margin: 0 }}>
+                            {taskDescription}
+                          </p>
+                        )}
+                      </div>
+
+                      <span className={getTaskPriorityClass(task.priority)}>{getTaskPriorityLabel(task.priority)}</span>
+                    </article>
+                  );
+                })}
+
+                {visibleTasks.length === 0 && (
                   <div className="empty-state">
                     {tasksModalTab === "todo" ? "Aucune tâche à faire." : "Aucune tâche terminée."}
                   </div>

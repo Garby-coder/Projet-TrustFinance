@@ -814,6 +814,97 @@ a.tf-startCta:active,
   margin-bottom: 14px;
 }
 
+.tf-tasksTabs {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tf-tasksTab {
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: var(--text2);
+  padding: 0 0 12px;
+  font-weight: 650;
+}
+
+.tf-tasksTab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.tf-tasksTab--active {
+  color: var(--text);
+}
+
+.tf-tasksTab--active::after {
+  background: #bf933b;
+}
+
+.tf-taskItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radiusSm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tf-taskCheckbox {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.tf-taskCheckbox.isChecked {
+  border-color: rgba(175, 135, 50, 0.45);
+  background: rgba(175, 135, 50, 0.18);
+}
+
+.tf-taskPriority {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.tf-taskPriority--high {
+  background: #2c1b1b;
+  color: #e94343;
+}
+
+.tf-taskPriority--medium {
+  background: #2d1f16;
+  color: #f97316;
+}
+
+.tf-taskPriority--low {
+  background: #1a212d;
+  color: #3b82f6;
+}
+
 .tf-app .tasks-widget {
   background: transparent;
   border: 0;
