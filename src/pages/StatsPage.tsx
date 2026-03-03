@@ -1645,7 +1645,10 @@ export default function StatsPage() {
                               }
                             >
                               <div className="tf-moduleTop">
-                                <h4 className="tf-moduleTitle tf-clamp2">{module.title}</h4>
+                                <div className="tf-moduleTitleBlock">
+                                  <h4 className="tf-moduleTitle tf-clamp2">{module.title}</h4>
+                                  <span className={`${moduleBadgeClass} tf-moduleBadge--small`}>{moduleBadgeLabel}</span>
+                                </div>
                                 <div
                                   className="tf-moduleRing"
                                   aria-label={`Progression ${progressPct}%`}
@@ -1653,9 +1656,6 @@ export default function StatsPage() {
                                 >
                                   <span>{progressPct}%</span>
                                 </div>
-                              </div>
-                              <div className="tf-moduleMeta">
-                                <span className={moduleBadgeClass}>{moduleBadgeLabel}</span>
                               </div>
                             </button>
 

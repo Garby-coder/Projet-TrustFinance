@@ -287,20 +287,28 @@
 }
 
 .tf-moduleCardFixed {
-  height: 132px;
+  height: 104px;
 }
 
 .tf-moduleTop {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
+}
+
+.tf-moduleTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: flex-start;
+  min-width: 0;
 }
 
 .tf-moduleTitle {
   font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-weight: 750;
+  line-height: 1.15;
   margin: 0;
   min-width: 0;
   color: var(--text);
@@ -320,7 +328,8 @@
   display: grid;
   place-items: center;
   position: relative;
-  flex-shrink: 0;
+  align-self: center;
+  flex: 0 0 auto;
   font-weight: 800;
 }
 
@@ -338,17 +347,32 @@
   font-size: 13px;
 }
 
+.tf-moduleBadge,
+.tf-moduleBadge--small {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
+  flex: 0 0 auto;
+}
+
 .tf-moduleBadge {
   height: 22px;
   padding: 0 10px;
   border-radius: 999px;
-  display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 650;
   font-size: 11px;
   line-height: 1;
   letter-spacing: 0.2px;
+}
+
+.tf-moduleBadge--small {
+  height: 20px;
+  padding: 0 10px;
+  font-size: 11px;
+  border-radius: 999px;
 }
 
 .tf-moduleBadge--done {
@@ -634,8 +658,9 @@
 .tf-app .card-button.tf-moduleCardFixed {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 8px;
   align-items: start;
+  padding: 14px 16px;
 }
 
 .tf-app .tf-moduleCardFixed .card-meta,
