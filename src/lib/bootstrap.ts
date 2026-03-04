@@ -1,32 +1,43 @@
 import { supabase } from "./supabase";
 
-const DEFAULT_BOOKING_URL = "https://calendly.com/trustfinanceam/reserve-ton-appel-avec-matheo-aalberg-clone";
+const SUBJECT_URLS = [
+  import.meta.env.VITE_CALENDLY_SUBJECT_1_URL,
+  import.meta.env.VITE_CALENDLY_SUBJECT_2_URL,
+  import.meta.env.VITE_CALENDLY_SUBJECT_3_URL,
+  import.meta.env.VITE_CALENDLY_SUBJECT_4_URL,
+  import.meta.env.VITE_CALENDLY_SUBJECT_5_URL,
+].map((value) => (value ?? "").trim());
+
+const FREE_URL = (import.meta.env.VITE_CALENDLY_FREE_URL ?? "").trim();
+
+const FALLBACK_URL = "https://calendly.com/trustfinanceam/reserve-ton-appel-avec-matheo-aalberg-clone";
+const RESOLVED_FREE_URL = FREE_URL || FALLBACK_URL;
 
 const DEFAULT_SESSIONS = [
   {
     theme: "Présentation de l’accompagnement & Bilan initial.",
     objective: "Clarifier le cadre, les attentes et analyser la situation actuelle du client.",
-    booking_url: DEFAULT_BOOKING_URL,
+    booking_url: SUBJECT_URLS[0] || FALLBACK_URL,
   },
   {
     theme: "Optimisation et structuration bancaire.",
     objective: "Optimiser l’organisation financière et comprendre comment fonctionne réellement le système bancaire.",
-    booking_url: DEFAULT_BOOKING_URL,
+    booking_url: SUBJECT_URLS[1] || FALLBACK_URL,
   },
   {
     theme: "Les bases fondamentales de l’investissement.",
     objective: "Comprendre pourquoi investir est indispensable et comment la richesse se crée réellement dans le temps.",
-    booking_url: DEFAULT_BOOKING_URL,
+    booking_url: SUBJECT_URLS[2] || FALLBACK_URL,
   },
   {
     theme: "Structurer son investissement intelligemment.",
     objective: "Apprendre à construire une base solide : fiscalité, allocation d’actifs, diversification et cohérence avec son profil.",
-    booking_url: DEFAULT_BOOKING_URL,
+    booking_url: SUBJECT_URLS[3] || FALLBACK_URL,
   },
   {
     theme: "Comprendre les marchés financiers et le système bancaire.",
     objective: "Comprendre où va réellement l’argent et pourquoi laisser dormir son capital est une erreur stratégique.",
-    booking_url: DEFAULT_BOOKING_URL,
+    booking_url: SUBJECT_URLS[4] || FALLBACK_URL,
   },
 ];
 
@@ -86,25 +97,30 @@ export async function ensureDefaultsForUser(userId: string) {
   } else {
     const { data: plannedSessions, error: plannedSessionsErr } = await supabase
       .from("sessions")
-      .select("id,theme,objective,booking_url")
+      .select("id,theme,objective,booking_url,scheduled_at")
       .eq("user_id", userId)
       .eq("status", "planned");
 
     if (plannedSessionsErr) throw plannedSessionsErr;
 
     const objectiveByTheme = new Map(DEFAULT_SESSIONS.map((session) => [session.theme, session.objective]));
+    const urlByTheme = new Map(DEFAULT_SESSIONS.map((session) => [session.theme, session.booking_url]));
 
     const sessionsToRepair = (plannedSessions ?? []).filter((session) => {
-      const bookingUrl = session.booking_url?.trim();
-      return !bookingUrl || bookingUrl.includes("REMPLACE_PAR_TON_LIEN_CALENDLY");
+      const bookingUrl = session.booking_url?.trim() ?? "";
+      return (
+        session.scheduled_at === null &&
+        (!bookingUrl || bookingUrl === FALLBACK_URL || bookingUrl.includes("REMPLACE_PAR_TON_LIEN_CALENDLY"))
+      );
     });
 
     for (const session of sessionsToRepair) {
       const fallbackObjective = session.theme ? objectiveByTheme.get(session.theme) : undefined;
       const isObjectiveEmpty = !session.objective || session.objective.trim().length === 0;
+      const resolvedBookingUrl = session.theme ? urlByTheme.get(session.theme) ?? FALLBACK_URL : RESOLVED_FREE_URL;
 
       const updatePayload: { booking_url: string; objective?: string } = {
-        booking_url: DEFAULT_BOOKING_URL,
+        booking_url: resolvedBookingUrl,
       };
 
       if (isObjectiveEmpty && fallbackObjective) {
