@@ -33,6 +33,14 @@ type SessionItem = {
   scheduled_at: string | null;
 };
 
+type CalendarSessionItem = {
+  id: string;
+  status: string | null;
+  scheduled_at: string | null;
+  theme: string | null;
+  booking_url: string | null;
+};
+
 type CalendlyUser = {
   id: string;
   email?: string | null;
@@ -71,6 +79,10 @@ type QuizQuestion = QuizQuestionRow & {
 };
 
 type ModuleFilter = "all" | "todo" | "done";
+
+const CALENDLY_FREE_FALLBACK_URL =
+  (import.meta.env.VITE_CALENDLY_FREE_URL ?? "").trim() ||
+  "https://calendly.com/trustfinanceam/reserve-ton-appel-avec-matheo-aalberg-clone";
 
 function parseDate(dateValue: string | null | undefined) {
   if (!dateValue) {
@@ -205,6 +217,21 @@ function formatDateKeyReadable(dateKey: string) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "full" }).format(new Date(year, month - 1, day));
 }
 
+function getMonthStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function getNextMonthStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 1);
+}
+
+function formatMonthTitle(date: Date) {
+  return new Intl.DateTimeFormat("fr-FR", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
 function isMissingModulesTable(error: { code?: string; message: string }) {
   const message = error.message.toLowerCase();
   return error.code === "42P01" || (message.includes("does not exist") && message.includes("modules"));
@@ -230,6 +257,11 @@ function isMissingLessonProgressTable(error: { code?: string; message: string })
 function isMissingSessionsTable(error: { code?: string; message: string }) {
   const message = error.message.toLowerCase();
   return error.code === "42P01" || (message.includes("does not exist") && message.includes("sessions"));
+}
+
+function isMissingEngagementEventsTable(error: { code?: string; message: string }) {
+  const message = error.message.toLowerCase();
+  return error.code === "42P01" || (message.includes("does not exist") && message.includes("engagement_events"));
 }
 
 function isMissingTasksTable(error: { code?: string; message: string }) {
@@ -363,6 +395,12 @@ export default function StatsPage() {
   const [quizSubmitMessage, setQuizSubmitMessage] = useState("");
   const [quizSubmitting, setQuizSubmitting] = useState(false);
   const [loadedQuizModuleId, setLoadedQuizModuleId] = useState<string | null>(null);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [calendarMonthDate, setCalendarMonthDate] = useState<Date>(() => getMonthStart(new Date()));
+  const [calendarSessions, setCalendarSessions] = useState<CalendarSessionItem[]>([]);
+  const [calendarLoginDays, setCalendarLoginDays] = useState<string[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState("");
   const [selectedCalendarDateKey, setSelectedCalendarDateKey] = useState<string | null>(null);
   const [showAllSessionsModal, setShowAllSessionsModal] = useState(false);
   const [sessionsModalTab, setSessionsModalTab] = useState<"upcoming" | "past">("upcoming");
@@ -801,6 +839,30 @@ export default function StatsPage() {
       return sortBySessionOrder(a, b);
     });
 
+  const nextSubjectBookingSession =
+    [...sessions]
+      .sort(sortBySessionOrder)
+      .find(
+        (session) =>
+          session.status?.toLowerCase() === "planned" &&
+          parseDate(session.scheduled_at) === null &&
+          !!session.theme &&
+          isValidHttpUrl(session.booking_url)
+      ) ?? null;
+
+  const nextFreeBookingSession =
+    [...sessions]
+      .sort(sortBySessionOrder)
+      .find(
+        (session) =>
+          session.status?.toLowerCase() === "planned" &&
+          parseDate(session.scheduled_at) === null &&
+          !session.theme &&
+          isValidHttpUrl(session.booking_url)
+      ) ?? null;
+
+  const freeBookingUrl = nextFreeBookingSession?.booking_url ?? CALENDLY_FREE_FALLBACK_URL;
+
   const todoTasks = tasks
     .filter((task) => !isDoneTask(task))
     .sort((a, b) => {
@@ -946,8 +1008,56 @@ export default function StatsPage() {
     return Number(yearRaw) === currentMonthStart.getFullYear() && Number(monthRaw) === currentMonthStart.getMonth() + 1;
   }).length;
 
-  const selectedDaySessions = selectedCalendarDateKey ? sessionsByDateKey[selectedCalendarDateKey] ?? [] : [];
+  const calendarSessionsByDateKey: Record<string, CalendarSessionItem[]> = {};
+  const loginDaySet = new Set(calendarLoginDays);
+  const plannedDaySet = new Set<string>();
+  const completedDaySet = new Set<string>();
+
+  for (const session of calendarSessions) {
+    const sessionTimestamp = parseDate(session.scheduled_at);
+    if (sessionTimestamp === null) {
+      continue;
+    }
+
+    const dateKey = toLocalDateKey(new Date(sessionTimestamp));
+    const list = calendarSessionsByDateKey[dateKey] ?? [];
+    list.push(session);
+    calendarSessionsByDateKey[dateKey] = list;
+
+    if (session.status?.toLowerCase() === "completed") {
+      completedDaySet.add(dateKey);
+    } else {
+      plannedDaySet.add(dateKey);
+    }
+  }
+
+  for (const dateKey of Object.keys(calendarSessionsByDateKey)) {
+    calendarSessionsByDateKey[dateKey].sort((a, b) => {
+      const timeA = parseDate(a.scheduled_at) ?? 0;
+      const timeB = parseDate(b.scheduled_at) ?? 0;
+      return timeA - timeB;
+    });
+  }
+
+  const calendarCurrentMonth = getMonthStart(calendarMonthDate);
+  const calendarMonthTitle = formatMonthTitle(calendarCurrentMonth);
+  const calendarDaysInMonth = new Date(calendarCurrentMonth.getFullYear(), calendarCurrentMonth.getMonth() + 1, 0).getDate();
+  const calendarStartOffset = (calendarCurrentMonth.getDay() + 6) % 7;
+  const calendarGridCells: Array<{ dateKey: string | null; dayNumber: number | null }> = [];
+
+  for (let index = 0; index < calendarStartOffset; index += 1) {
+    calendarGridCells.push({ dateKey: null, dayNumber: null });
+  }
+
+  for (let day = 1; day <= calendarDaysInMonth; day += 1) {
+    const dateKey = toLocalDateKey(new Date(calendarCurrentMonth.getFullYear(), calendarCurrentMonth.getMonth(), day));
+    calendarGridCells.push({ dateKey, dayNumber: day });
+  }
+
+  const selectedDaySessions = selectedCalendarDateKey ? calendarSessionsByDateKey[selectedCalendarDateKey] ?? [] : [];
   const selectedDateReadable = selectedCalendarDateKey ? formatDateKeyReadable(selectedCalendarDateKey) : "";
+  const calendarPlannedCount = calendarSessions.filter((session) => session.status?.toLowerCase() === "planned").length;
+  const calendarCompletedCount = calendarSessions.filter((session) => session.status?.toLowerCase() === "completed").length;
 
   const activeModuleLessons = activeModule
     ? moduleLessons.filter((lesson) => lesson.module_id === activeModule.id).sort((a, b) => a.order_index - b.order_index)
@@ -1002,6 +1112,41 @@ export default function StatsPage() {
     }
 
     setExpandedModuleId(module.id);
+  }
+
+  function openCalendlyWindow(baseUrl: string | null | undefined) {
+    if (!baseUrl || !isValidHttpUrl(baseUrl)) {
+      return;
+    }
+
+    const openedWindow = window.open(buildCalendlyUrl(baseUrl, currentUser), "_blank", "noopener,noreferrer");
+    if (openedWindow) {
+      openedWindow.opener = null;
+    }
+  }
+
+  function trackFreeBookingClick() {
+    if (!userId) {
+      return;
+    }
+
+    const dateKey = toLocalDateKey(new Date());
+
+    void (async () => {
+      try {
+        const result = await registerEngagementAction({
+          userId,
+          eventKey: `booking_free_clicked:${dateKey}`,
+          xpGain: 0,
+        });
+
+        if (result.applied) {
+          window.dispatchEvent(new CustomEvent("tf:engagement", { detail: result }));
+        }
+      } catch {
+        // Ne bloque jamais l'ouverture de Calendly si le tracking échoue.
+      }
+    })();
   }
 
   function handleOpenFormationAction() {
@@ -1080,6 +1225,87 @@ export default function StatsPage() {
 
     setExpandedModuleId(currentModuleId);
   }, [currentModuleId, expandedModuleId, moduleFilter]);
+
+  useEffect(() => {
+    if (!isCalendarOpen || !userId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    (async () => {
+      setCalendarLoading(true);
+      setCalendarError("");
+
+      const monthStart = getMonthStart(calendarMonthDate);
+      const nextMonthStart = getNextMonthStart(calendarMonthDate);
+      const startOfMonthIso = monthStart.toISOString();
+      const startOfNextMonthIso = nextMonthStart.toISOString();
+
+      let nextCalendarSessions: CalendarSessionItem[] = [];
+      let nextCalendarLoginDays: string[] = [];
+      let nextError = "";
+
+      const { data: monthSessions, error: monthSessionsError } = await supabase
+        .from("sessions")
+        .select("id,status,scheduled_at,theme,booking_url")
+        .eq("user_id", userId)
+        .gte("scheduled_at", startOfMonthIso)
+        .lt("scheduled_at", startOfNextMonthIso)
+        .order("scheduled_at", { ascending: true });
+
+      if (monthSessionsError) {
+        nextError = isMissingSessionsTable(monthSessionsError)
+          ? "La table des séances est indisponible pour le moment."
+          : `Impossible de charger le calendrier : ${monthSessionsError.message}`;
+      } else {
+        nextCalendarSessions = (monthSessions ?? []) as CalendarSessionItem[];
+      }
+
+      const { data: loginEvents, error: loginEventsError } = await supabase
+        .from("engagement_events")
+        .select("event_key,created_at")
+        .eq("user_id", userId)
+        .gte("created_at", startOfMonthIso)
+        .lt("created_at", startOfNextMonthIso)
+        .like("event_key", "login:%");
+
+      if (loginEventsError) {
+        if (!isMissingEngagementEventsTable(loginEventsError) && !nextError) {
+          nextError = `Impossible de charger les connexions du mois : ${loginEventsError.message}`;
+        }
+      } else {
+        const loginDaySet = new Set<string>();
+
+        for (const row of (loginEvents ?? []) as Array<{ event_key: string | null; created_at: string | null }>) {
+          const eventKey = row.event_key?.trim() ?? "";
+          if (!eventKey.startsWith("login:")) {
+            continue;
+          }
+
+          const dateKey = eventKey.slice("login:".length).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+            loginDaySet.add(dateKey);
+          }
+        }
+
+        nextCalendarLoginDays = [...loginDaySet].sort((a, b) => a.localeCompare(b, "fr"));
+      }
+
+      if (!isMounted) {
+        return;
+      }
+
+      setCalendarSessions(nextCalendarSessions);
+      setCalendarLoginDays(nextCalendarLoginDays);
+      setCalendarError(nextError);
+      setCalendarLoading(false);
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [calendarMonthDate, isCalendarOpen, userId]);
 
   function renderActivePanelBody() {
     if (!activeModule) {
@@ -1604,13 +1830,10 @@ export default function StatsPage() {
                   type="button"
                   className="card-button tf-card tf-quickCard"
                   onClick={() => {
-                    const firstDateValue = upcomingSessionsAll[0]?.scheduled_at ?? pastSessionsAll[0]?.scheduled_at ?? null;
-                    const timestamp = parseDate(firstDateValue);
-                    if (timestamp !== null) {
-                      setSelectedCalendarDateKey(toLocalDateKey(new Date(timestamp)));
-                    }
+                    setCalendarMonthDate(getMonthStart(new Date()));
+                    setSelectedCalendarDateKey(null);
+                    setIsCalendarOpen(true);
                   }}
-                  disabled={upcomingSessionsAll.length + pastSessionsAll.length === 0}
                 >
                   <span className="tf-quickIcon" aria-hidden="true">◷</span>
                   <div className="tf-quickText">
@@ -2068,52 +2291,247 @@ export default function StatsPage() {
         </div>
       )}
 
-      {selectedCalendarDateKey && (
-        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setSelectedCalendarDateKey(null)}>
-          <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(720px, 100%)", maxHeight: "85vh" }}>
+      {isCalendarOpen && (
+        <div
+          className="modal-backdrop tf-modalBackdrop"
+          onClick={() => {
+            setIsCalendarOpen(false);
+            setSelectedCalendarDateKey(null);
+          }}
+        >
+          <div
+            className="modal-panel tf-modalPanel tf-card"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(1180px, 100%)", maxHeight: "90vh" }}
+          >
             <div className="modal-header">
               <div>
-                <h3 className="modal-title tf-title">Séances du {selectedDateReadable}</h3>
+                <h3 className="modal-title tf-title">Mon Calendrier</h3>
+                <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
+                  Suis tes connexions, tes rendez-vous et ton activité du mois.
+                </p>
               </div>
-              <button type="button" className="btn" onClick={() => setSelectedCalendarDateKey(null)}>
-                Fermer
+              <button
+                type="button"
+                className="btn"
+                aria-label="Fermer le calendrier"
+                onClick={() => {
+                  setIsCalendarOpen(false);
+                  setSelectedCalendarDateKey(null);
+                }}
+              >
+                ×
               </button>
             </div>
 
-            {selectedDaySessions.length === 0 && <div className="empty-state">Aucune séance ce jour.</div>}
+            {calendarError && <div className="error-box">{calendarError}</div>}
 
-            {selectedDaySessions.length > 0 && (
-              <div className="tf-scroll" style={{ display: "grid", gap: 8 }}>
-                {selectedDaySessions.map((session) => {
-                  const hourLabel = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(
-                    new Date(parseDate(session.scheduled_at) ?? Date.now())
-                  );
-                  const statusLabel = session.status?.toLowerCase() === "completed" ? "completed" : "planned";
-                  const canReplan = statusLabel === "planned" && isValidHttpUrl(session.booking_url);
+            <div className="tf-calendarLayout">
+              <div className="tf-calendarMain">
+                <div className="tf-calendarNav">
+                  <button
+                    type="button"
+                    className="tf-btn"
+                    onClick={() => {
+                      setSelectedCalendarDateKey(null);
+                      setCalendarMonthDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1));
+                    }}
+                  >
+                    Précédent
+                  </button>
+                  <h4 className="tf-title tf-calendarMonthTitle">{calendarMonthTitle}</h4>
+                  <button
+                    type="button"
+                    className="tf-btn"
+                    onClick={() => {
+                      setSelectedCalendarDateKey(null);
+                      setCalendarMonthDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1));
+                    }}
+                  >
+                    Suivant
+                  </button>
+                </div>
 
-                  return (
-                    <article key={session.id} className="card tf-card">
-                      <p className="card-meta">
-                        {hourLabel} · {statusLabel}
-                      </p>
-                      <h4 className="card-title tf-title">{session.theme ?? "Séance sans thème"}</h4>
+                <div className="tf-calendarWeekdays" role="presentation">
+                  {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((label) => (
+                    <span key={label} className="tf-calendarWeekday">
+                      {label}
+                    </span>
+                  ))}
+                </div>
 
-                      {canReplan && (
-                        <a
-                          href={buildCalendlyUrl(session.booking_url ?? "#", currentUser)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-primary card-action"
-                        >
-                          Replanifier
-                        </a>
-                      )}
-                    </article>
-                  );
-                })}
+                <div className="tf-calendarGrid">
+                  {calendarGridCells.map((cell, index) => {
+                    if (!cell.dateKey || !cell.dayNumber) {
+                      return <div key={`empty-${index}`} className="tf-calendarDay tf-calendarDay--empty" aria-hidden="true" />;
+                    }
+
+                    const hasLogin = loginDaySet.has(cell.dateKey);
+                    const hasPlanned = plannedDaySet.has(cell.dateKey);
+                    const hasCompleted = completedDaySet.has(cell.dateKey);
+                    const hasActivity = hasLogin || hasPlanned || hasCompleted;
+                    const toneClass = hasCompleted
+                      ? " isCompleted"
+                      : hasPlanned
+                        ? " isPlanned"
+                        : hasLogin
+                          ? " isLogin"
+                          : "";
+
+                    return (
+                      <button
+                        key={cell.dateKey}
+                        type="button"
+                        className={`tf-calendarDay${toneClass}${hasActivity ? " isInteractive" : ""}`}
+                        onClick={() => {
+                          if (!hasActivity) {
+                            return;
+                          }
+
+                          setSelectedCalendarDateKey(cell.dateKey);
+                        }}
+                        disabled={!hasActivity}
+                        aria-label={`Jour ${cell.dayNumber}`}
+                      >
+                        <span className="tf-calendarDayNumber">{cell.dayNumber}</span>
+                        <div className="tf-calendarMarkers">
+                          {hasLogin && <span className="tf-calendarMarker tf-calendarMarker--login">Connexion</span>}
+                          {hasPlanned && <span className="tf-calendarMarker tf-calendarMarker--planned">Séance programmée</span>}
+                          {hasCompleted && <span className="tf-calendarMarker tf-calendarMarker--completed">Séance effectuée</span>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {calendarLoading && <p className="muted tf-muted">Chargement du calendrier...</p>}
+
+                <div className="tf-calendarLegend">
+                  <span className="tf-calendarLegendItem">
+                    <span className="tf-calendarDot tf-calendarDot--login" aria-hidden="true" />
+                    Connexion
+                  </span>
+                  <span className="tf-calendarLegendItem">
+                    <span className="tf-calendarDot tf-calendarDot--planned" aria-hidden="true" />
+                    Séance programmée
+                  </span>
+                  <span className="tf-calendarLegendItem">
+                    <span className="tf-calendarDot tf-calendarDot--completed" aria-hidden="true" />
+                    Séance effectuée
+                  </span>
+                </div>
               </div>
-            )}
+
+              <aside className="tf-calendarSidebar">
+                <div className="tf-card tf-card--flat tf-calendarPanel">
+                  <h4 className="tf-title" style={{ margin: 0 }}>Prendre un rendez-vous</h4>
+                  <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
+                    Choisis le bon créneau. Les informations sont préremplies automatiquement.
+                  </p>
+                  <div className="tf-calendarSidebarActions">
+                    <button
+                      type="button"
+                      className="tf-btn tf-btn--accent"
+                      onClick={() => openCalendlyWindow(nextSubjectBookingSession?.booking_url ?? null)}
+                      disabled={!nextSubjectBookingSession?.booking_url}
+                    >
+                      RDV avec sujet
+                    </button>
+                    <button
+                      type="button"
+                      className="tf-btn"
+                      onClick={() => {
+                        trackFreeBookingClick();
+                        openCalendlyWindow(freeBookingUrl);
+                      }}
+                      disabled={!isValidHttpUrl(freeBookingUrl)}
+                    >
+                      RDV sans sujet
+                    </button>
+                  </div>
+                  <p className="tf-muted" style={{ margin: 0 }}>
+                    Le détail du sujet se retrouve automatiquement dans le lien de réservation.
+                  </p>
+                </div>
+
+                <div className="tf-card tf-card--flat tf-calendarPanel">
+                  <h4 className="tf-title" style={{ margin: 0 }}>Ce mois-ci</h4>
+                  <div className="tf-calendarStats">
+                    <div className="tf-calendarStat">
+                      <span className="tf-calendarStatLabel">Connexions</span>
+                      <strong className="tf-title">{loginDaySet.size}</strong>
+                    </div>
+                    <div className="tf-calendarStat">
+                      <span className="tf-calendarStatLabel">Séances à venir</span>
+                      <strong className="tf-title">{calendarPlannedCount}</strong>
+                    </div>
+                    <div className="tf-calendarStat">
+                      <span className="tf-calendarStatLabel">Séances faites</span>
+                      <strong className="tf-title">{calendarCompletedCount}</strong>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
           </div>
+
+          {selectedCalendarDateKey && (
+            <div
+              className="modal-backdrop tf-modalBackdrop"
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedCalendarDateKey(null);
+              }}
+            >
+              <div
+                className="modal-panel tf-modalPanel tf-card"
+                onClick={(event) => event.stopPropagation()}
+                style={{ width: "min(720px, 100%)", maxHeight: "80vh" }}
+              >
+                <div className="modal-header">
+                  <div>
+                    <h3 className="modal-title tf-title">Séances du {selectedDateReadable}</h3>
+                  </div>
+                  <button type="button" className="btn" onClick={() => setSelectedCalendarDateKey(null)}>
+                    Fermer
+                  </button>
+                </div>
+
+                {selectedDaySessions.length === 0 && <div className="empty-state">Aucune séance ce jour.</div>}
+
+                {selectedDaySessions.length > 0 && (
+                  <div className="tf-scroll" style={{ display: "grid", gap: 8, maxHeight: "60vh" }}>
+                    {selectedDaySessions.map((session) => {
+                      const hourLabel = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(
+                        new Date(parseDate(session.scheduled_at) ?? Date.now())
+                      );
+                      const isCompleted = session.status?.toLowerCase() === "completed";
+                      const canReplan = !isCompleted && isValidHttpUrl(session.booking_url);
+
+                      return (
+                        <article key={session.id} className="card tf-card">
+                          <p className="card-meta">
+                            {hourLabel} · {isCompleted ? "Effectuée" : "Programmée"}
+                          </p>
+                          <h4 className="card-title tf-title">{session.theme ?? "Séance libre"}</h4>
+
+                          {canReplan && (
+                            <button
+                              type="button"
+                              className="btn btn-primary card-action"
+                              onClick={() => openCalendlyWindow(session.booking_url)}
+                            >
+                              Replanifier
+                            </button>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>

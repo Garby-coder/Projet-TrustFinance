@@ -952,3 +952,226 @@ a.tf-startCta:active,
     grid-template-columns: 1fr;
   }
 }
+
+.tf-calendarLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  min-height: 0;
+}
+
+.tf-calendarMain {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.tf-calendarSidebar {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.tf-calendarPanel {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.tf-calendarNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tf-calendarMonthTitle {
+  margin: 0;
+  text-transform: capitalize;
+  text-align: center;
+}
+
+.tf-calendarWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tf-calendarWeekday {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tf-calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tf-calendarDay {
+  min-height: 112px;
+  border-radius: var(--radiusSm);
+  border: 1px solid var(--border2);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  text-align: left;
+  color: var(--text);
+}
+
+.tf-calendarDay.isInteractive {
+  cursor: pointer;
+}
+
+.tf-calendarDay.isLogin {
+  border-color: rgba(191, 147, 59, 0.35);
+  background: rgba(191, 147, 59, 0.08);
+}
+
+.tf-calendarDay.isPlanned {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.tf-calendarDay.isCompleted {
+  border-color: rgba(40, 209, 124, 0.35);
+  background: rgba(40, 209, 124, 0.08);
+}
+
+.tf-calendarDay:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.tf-calendarDay--empty {
+  border-style: dashed;
+  opacity: 0.22;
+}
+
+.tf-calendarDayNumber {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.tf-calendarMarkers {
+  display: grid;
+  gap: 6px;
+}
+
+.tf-calendarMarker {
+  min-height: 20px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.tf-calendarMarker--login {
+  background: rgba(191, 147, 59, 0.16);
+  color: #f7d37c;
+}
+
+.tf-calendarMarker--planned {
+  background: rgba(59, 130, 246, 0.16);
+  color: #9bc0ff;
+}
+
+.tf-calendarMarker--completed {
+  background: rgba(40, 209, 124, 0.16);
+  color: #baf8d7;
+}
+
+.tf-calendarSidebarActions {
+  display: grid;
+  gap: 10px;
+}
+
+.tf-calendarStats {
+  display: grid;
+  gap: 10px;
+}
+
+.tf-calendarStat {
+  border: 1px solid var(--border2);
+  border-radius: var(--radiusSm);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tf-calendarStatLabel {
+  color: var(--text2);
+  font-size: 13px;
+}
+
+.tf-calendarLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+
+.tf-calendarLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text2);
+  font-size: 12px;
+}
+
+.tf-calendarDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.tf-calendarDot--login {
+  background: #bf933b;
+}
+
+.tf-calendarDot--planned {
+  background: #3b82f6;
+}
+
+.tf-calendarDot--completed {
+  background: #28d17c;
+}
+
+@media (max-width: 1000px) {
+  .tf-calendarLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .tf-calendarGrid,
+  .tf-calendarWeekdays {
+    gap: 6px;
+  }
+
+  .tf-calendarDay {
+    min-height: 92px;
+    padding: 10px;
+  }
+
+  .tf-calendarMarker {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+}
