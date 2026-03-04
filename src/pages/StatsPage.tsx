@@ -33,6 +33,12 @@ type SessionItem = {
   scheduled_at: string | null;
 };
 
+type CalendlyUser = {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+};
+
 type TaskItem = {
   id: string;
   title: string;
@@ -156,6 +162,34 @@ function toLocalDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function buildCalendlyUrl(baseUrl: string, user: CalendlyUser | null) {
+  try {
+    const url = new URL(baseUrl);
+
+    if (!user?.id) {
+      return url.toString();
+    }
+
+    if (user.email) {
+      url.searchParams.set("email", user.email);
+    }
+
+    const metadata = user.user_metadata ?? {};
+    const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
+    const name = typeof metadata.name === "string" ? metadata.name.trim() : "";
+    const resolvedName = fullName || name;
+
+    if (resolvedName) {
+      url.searchParams.set("name", resolvedName);
+    }
+
+    url.searchParams.set("a1", user.id);
+    return url.toString();
+  } catch {
+    return baseUrl;
+  }
 }
 
 function formatDateKeyReadable(dateKey: string) {
@@ -292,6 +326,7 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<CalendlyUser | null>(null);
 
   const [modules, setModules] = useState<ModuleItem[]>([]);
   const [moduleLessons, setModuleLessons] = useState<ModuleLesson[]>([]);
@@ -368,6 +403,18 @@ export default function StatsPage() {
         return;
       }
 
+      const currentUser = userData.user
+        ? {
+            id: userData.user.id,
+            email: userData.user.email ?? null,
+            user_metadata:
+              userData.user.user_metadata && typeof userData.user.user_metadata === "object"
+                ? (userData.user.user_metadata as Record<string, unknown>)
+                : null,
+          }
+        : null;
+
+      setCurrentUser(currentUser);
       setUserId(currentUserId);
 
       if (!currentUserId) {
@@ -1914,7 +1961,12 @@ export default function StatsPage() {
                       <h4 className="card-title tf-title">{session.theme ?? "Séance sans thème"}</h4>
                       <p className="card-text">{session.objective ?? "Objectif non renseigné."}</p>
                       {canReplan && (
-                        <a href={session.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                        <a
+                          href={buildCalendlyUrl(session.booking_url ?? "#", currentUser)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-primary card-action"
+                        >
                           Replanifier
                         </a>
                       )}
@@ -2047,7 +2099,12 @@ export default function StatsPage() {
                       <h4 className="card-title tf-title">{session.theme ?? "Séance sans thème"}</h4>
 
                       {canReplan && (
-                        <a href={session.booking_url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                        <a
+                          href={buildCalendlyUrl(session.booking_url ?? "#", currentUser)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-primary card-action"
+                        >
                           Replanifier
                         </a>
                       )}

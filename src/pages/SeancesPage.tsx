@@ -19,6 +19,12 @@ type SessionItem = {
   transcript: string | null;
 };
 
+type CalendlyUser = {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+};
+
 function parseDate(dateValue: string | null) {
   if (!dateValue) {
     return null;
@@ -49,6 +55,34 @@ function getLocalDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function buildCalendlyUrl(baseUrl: string, user: CalendlyUser | null) {
+  try {
+    const url = new URL(baseUrl);
+
+    if (!user?.id) {
+      return url.toString();
+    }
+
+    if (user.email) {
+      url.searchParams.set("email", user.email);
+    }
+
+    const metadata = user.user_metadata ?? {};
+    const fullName = typeof metadata.full_name === "string" ? metadata.full_name.trim() : "";
+    const name = typeof metadata.name === "string" ? metadata.name.trim() : "";
+    const resolvedName = fullName || name;
+
+    if (resolvedName) {
+      url.searchParams.set("name", resolvedName);
+    }
+
+    url.searchParams.set("a1", user.id);
+    return url.toString();
+  } catch {
+    return baseUrl;
+  }
 }
 
 function sortWithNullDatesLastAscending(a: SessionItem, b: SessionItem) {
@@ -132,6 +166,7 @@ export default function SeancesPage() {
   const [loading, setLoading] = useState(true);
   const [lockingEnabled, setLockingEnabled] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<CalendlyUser | null>(null);
   const [now] = useState(() => Date.now());
   const scanSignatureRef = useRef("");
 
@@ -149,7 +184,19 @@ export default function SeancesPage() {
         return;
       }
 
-      setUserId(data.user?.id ?? null);
+      const user = data.user
+        ? {
+            id: data.user.id,
+            email: data.user.email ?? null,
+            user_metadata:
+              data.user.user_metadata && typeof data.user.user_metadata === "object"
+                ? (data.user.user_metadata as Record<string, unknown>)
+                : null,
+          }
+        : null;
+
+      setCurrentUser(user);
+      setUserId(user?.id ?? null);
     })();
 
     return () => {
@@ -341,6 +388,17 @@ export default function SeancesPage() {
             return;
           }
 
+          if (data.user) {
+            setCurrentUser({
+              id: data.user.id,
+              email: data.user.email ?? null,
+              user_metadata:
+                data.user.user_metadata && typeof data.user.user_metadata === "object"
+                  ? (data.user.user_metadata as Record<string, unknown>)
+                  : null,
+            });
+          }
+
           currentUserId = data.user?.id ?? null;
         }
 
@@ -362,7 +420,7 @@ export default function SeancesPage() {
       }
     })();
 
-    const openedWindow = window.open(CALENDLY_FREE_URL, "_blank", "noopener,noreferrer");
+    const openedWindow = window.open(buildCalendlyUrl(CALENDLY_FREE_URL, currentUser), "_blank", "noopener,noreferrer");
     if (openedWindow) {
       openedWindow.opener = null;
     }
@@ -397,7 +455,12 @@ export default function SeancesPage() {
                       <p className="card-text clamp-2">{session.objective ?? "Objectif non renseigné."}</p>
 
                       {session.booking_url && !isLockedPlanned(session) ? (
-                        <a href={session.booking_url} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                        <a
+                          href={buildCalendlyUrl(session.booking_url, currentUser)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-primary card-action"
+                        >
                           Replanifier
                         </a>
                       ) : isLockedPlanned(session) ? (
@@ -420,7 +483,12 @@ export default function SeancesPage() {
                     <p className="card-text clamp-2">{session.objective ?? "Objectif non renseigné."}</p>
 
                     {session.booking_url && !isLockedPlanned(session) ? (
-                      <a href={session.booking_url} target="_blank" rel="noreferrer" className="btn btn-primary card-action">
+                      <a
+                        href={buildCalendlyUrl(session.booking_url, currentUser)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-primary card-action"
+                      >
                         Réserver
                       </a>
                     ) : isLockedPlanned(session) ? (
