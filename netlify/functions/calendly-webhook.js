@@ -52,8 +52,8 @@ function getHeader(headers, name) {
 }
 
 function getRawBody(event) {
-  const body = typeof event.body === "string" ? event.body : "";
-  if (event.isBase64Encoded) {
+  const body = typeof event?.body === "string" ? event.body : "";
+  if (event?.isBase64Encoded) {
     return Buffer.from(body, "base64").toString("utf8");
   }
 
@@ -363,40 +363,66 @@ async function handleInviteeCanceled({ supabaseUrl, serviceRoleKey, userId, payl
 }
 
 exports.handler = async function handler(event) {
+  if (event?.httpMethod !== "POST") {
+    return jsonResponse(405, { ok: false, error: "method_not_allowed" });
+  }
+
   const signingKey = process.env.CALENDLY_SIGNING_KEY;
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const missing = [];
 
-  if (!signingKey || !supabaseUrl || !serviceRoleKey) {
-    console.error("Webhook Calendly non configuré: variables d'environnement manquantes.");
-    return jsonResponse(500, { ok: false });
+  if (!signingKey) {
+    missing.push("CALENDLY_SIGNING_KEY");
+  }
+  if (!supabaseUrl) {
+    missing.push("SUPABASE_URL");
+  }
+  if (!serviceRoleKey) {
+    missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  }
+
+  if (missing.length > 0) {
+    console.error("Webhook Calendly non configuré: variables d'environnement manquantes.", missing);
+    return jsonResponse(500, { ok: false, error: "missing_env", missing });
   }
 
   const rawBody = getRawBody(event);
+  if (!rawBody.trim()) {
+    return jsonResponse(400, { ok: false, error: "invalid_json" });
+  }
+
   const signatureHeader = getHeader(event.headers, "calendly-webhook-signature");
+  if (!signatureHeader) {
+    return jsonResponse(401, { ok: false, error: "missing_signature" });
+  }
 
   if (!verifySignature(rawBody, signatureHeader, signingKey)) {
-    return jsonResponse(401, { ok: false });
+    return jsonResponse(401, { ok: false, error: "invalid_signature" });
   }
 
   let payload;
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    return jsonResponse(400, { ok: false });
+    return jsonResponse(400, { ok: false, error: "invalid_json" });
   }
 
   const webhookEvent = payload?.event;
   const webhookPayload = payload?.payload;
 
+  if (!webhookEvent || !webhookPayload) {
+    return jsonResponse(200, { ok: true, ignored: true });
+  }
+
   if (webhookEvent !== "invitee.created" && webhookEvent !== "invitee.canceled") {
-    return jsonResponse(200, { ok: true });
+    return jsonResponse(200, { ok: true, ignored: true });
   }
 
   const userId = extractUserId(webhookPayload);
   if (!userId) {
     console.warn("Webhook Calendly ignoré: TF_USER_ID absent ou invalide.");
-    return jsonResponse(200, { ok: true });
+    return jsonResponse(200, { ok: true, ignored: true });
   }
 
   try {
@@ -417,7 +443,7 @@ exports.handler = async function handler(event) {
     }
   } catch (error) {
     console.error("Erreur webhook Calendly.", error);
-    return jsonResponse(500, { ok: false });
+    return jsonResponse(500, { ok: false, error: "internal_error" });
   }
 
   return jsonResponse(200, { ok: true });
