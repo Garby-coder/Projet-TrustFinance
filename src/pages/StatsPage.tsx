@@ -263,6 +263,29 @@ function formatMonthTitle(date: Date) {
   }).format(date);
 }
 
+function pickWithTopicSessionId(sessions: SessionItem[]) {
+  const themedSessions = sessions.filter((session) => !!session.theme?.trim());
+
+  for (const theme of COACH_THEME_ORDER) {
+    const nextToPlan = themedSessions.find(
+      (session) => session.theme === theme && session.status?.toLowerCase() === "planned" && session.scheduled_at === null
+    );
+
+    if (nextToPlan) {
+      return nextToPlan.id;
+    }
+  }
+
+  for (const theme of COACH_THEME_ORDER) {
+    const firstByTheme = themedSessions.find((session) => session.theme === theme);
+    if (firstByTheme) {
+      return firstByTheme.id;
+    }
+  }
+
+  return themedSessions[0]?.id ?? null;
+}
+
 function isMissingModulesTable(error: { code?: string; message: string }) {
   const message = error.message.toLowerCase();
   return error.code === "42P01" || (message.includes("does not exist") && message.includes("modules"));
@@ -418,6 +441,7 @@ export default function StatsPage() {
   const [coachTopicFilter, setCoachTopicFilter] = useState<"with" | "without">("with");
   const [coachTimeFilter, setCoachTimeFilter] = useState<"all" | "upcoming" | "past">("all");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [pendingCoachingSelect, setPendingCoachingSelect] = useState(false);
   const [showViewModeMenu, setShowViewModeMenu] = useState(false);
   const [moduleFilter, setModuleFilter] = useState<ModuleFilter>("all");
 
@@ -957,17 +981,6 @@ export default function StatsPage() {
       return sortBySessionOrder(a, b);
     });
 
-  const nextSubjectBookingSession =
-    [...sessions]
-      .sort(sortBySessionOrder)
-      .find(
-        (session) =>
-          session.status?.toLowerCase() === "planned" &&
-          parseDate(session.scheduled_at) === null &&
-          !!session.theme &&
-          isValidHttpUrl(session.booking_url)
-      ) ?? null;
-
   const nextFreeBookingSession =
     [...sessions]
       .sort(sortBySessionOrder)
@@ -1471,6 +1484,27 @@ export default function StatsPage() {
   }, [currentModuleId, expandedModuleId, moduleFilter]);
 
   useEffect(() => {
+    function handleNavigateToCoaching(event: Event) {
+      const detail = (event as CustomEvent<{ topic?: "with" | "without" }>).detail;
+      if (!detail || detail.topic !== "with") {
+        return;
+      }
+
+      setViewMode("coaching");
+      setCoachTopicFilter("with");
+      setCoachTimeFilter("all");
+      setShowViewModeMenu(false);
+      setShowExpandedContent(false);
+      setPendingCoachingSelect(true);
+    }
+
+    window.addEventListener("tf:navigateToCoaching", handleNavigateToCoaching as EventListener);
+    return () => {
+      window.removeEventListener("tf:navigateToCoaching", handleNavigateToCoaching as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedSessionId) {
       return;
     }
@@ -1480,6 +1514,20 @@ export default function StatsPage() {
       setSelectedSessionId(null);
     }
   }, [coachSessionsSorted, selectedSessionId]);
+
+  useEffect(() => {
+    if (!pendingCoachingSelect || viewMode !== "coaching") {
+      return;
+    }
+
+    if (loading) {
+      return;
+    }
+
+    const pickedSessionId = pickWithTopicSessionId(sessions);
+    setSelectedSessionId(pickedSessionId);
+    setPendingCoachingSelect(false);
+  }, [loading, pendingCoachingSelect, sessions, viewMode]);
 
   useEffect(() => {
     if (!isCalendarOpen || !userId) {
@@ -3103,8 +3151,11 @@ export default function StatsPage() {
                     <button
                       type="button"
                       className="tf-btn tf-btn--accent"
-                      onClick={() => openCalendlyWindow(nextSubjectBookingSession?.booking_url ?? null)}
-                      disabled={!nextSubjectBookingSession?.booking_url}
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent("tf:navigateToCoaching", { detail: { topic: "with" } }));
+                        setSelectedCalendarDateKey(null);
+                        setIsCalendarOpen(false);
+                      }}
                     >
                       RDV avec sujet
                     </button>
