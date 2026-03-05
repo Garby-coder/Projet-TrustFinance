@@ -157,6 +157,11 @@ function isDoneTask(task: TaskItem) {
   return normalized === "done" || normalized === "completed";
 }
 
+function isLessonDone(progress?: { status?: string | null; done_at?: string | null }) {
+  const normalizedStatus = (progress?.status ?? "").toLowerCase();
+  return normalizedStatus === "done" || normalizedStatus === "completed" || Boolean(progress?.done_at);
+}
+
 function normalizeTaskPriority(priority: string | null | undefined) {
   const normalized = priority?.trim().toLowerCase();
 
@@ -453,6 +458,7 @@ export default function StatsPage() {
   const [coachTopicFilter, setCoachTopicFilter] = useState<"with" | "without">("with");
   const [coachTimeFilter, setCoachTimeFilter] = useState<"all" | "upcoming" | "past">("all");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [needsAutoSelectLesson, setNeedsAutoSelectLesson] = useState(false);
   const [pendingCoachingSelect, setPendingCoachingSelect] = useState(false);
   const [showViewModeMenu, setShowViewModeMenu] = useState(false);
   const [moduleFilter, setModuleFilter] = useState<ModuleFilter>("all");
@@ -1657,6 +1663,72 @@ export default function StatsPage() {
     setSelectedSessionId(pickedSessionId);
     setPendingCoachingSelect(false);
   }, [loading, pendingCoachingSelect, sessions, viewMode]);
+
+  useEffect(() => {
+    if (viewMode === "accompagnement") {
+      setNeedsAutoSelectLesson(true);
+    }
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "accompagnement") {
+      return;
+    }
+
+    if (!needsAutoSelectLesson) {
+      return;
+    }
+
+    if (modules.length === 0 || moduleLessons.length === 0) {
+      return;
+    }
+
+    const moduleOrderById = new Map(modules.map((module, index) => [module.id, index]));
+    const lessonsSorted = [...moduleLessons]
+      .filter((lesson) => lesson.is_published !== false)
+      .sort((a, b) => {
+        const moduleOrderA = a.module_id ? (moduleOrderById.get(a.module_id) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+        const moduleOrderB = b.module_id ? (moduleOrderById.get(b.module_id) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+
+        if (moduleOrderA !== moduleOrderB) {
+          return moduleOrderA - moduleOrderB;
+        }
+
+        const lessonOrderA = a.order_index ?? 0;
+        const lessonOrderB = b.order_index ?? 0;
+        if (lessonOrderA !== lessonOrderB) {
+          return lessonOrderA - lessonOrderB;
+        }
+
+        return a.id.localeCompare(b.id, "fr");
+      });
+
+    const progressByLessonId: Record<string, { status?: string | null; done_at?: string | null }> = {};
+    for (const [lessonId, done] of Object.entries(completedByLessonId)) {
+      if (done) {
+        progressByLessonId[lessonId] = { status: "done" };
+      }
+    }
+
+    const nextLesson =
+      lessonsSorted.find((lesson) => !isLessonDone(progressByLessonId[lesson.id])) ??
+      lessonsSorted[lessonsSorted.length - 1] ??
+      null;
+
+    if (nextLesson?.id) {
+      setActiveLessonId(nextLesson.id);
+      setActiveTab("lessons");
+
+      if (nextLesson.module_id) {
+        const nextModule = modules.find((module) => module.id === nextLesson.module_id) ?? null;
+        if (nextModule) {
+          setActiveModule(nextModule);
+        }
+      }
+    }
+
+    setNeedsAutoSelectLesson(false);
+  }, [completedByLessonId, moduleLessons, modules, needsAutoSelectLesson, viewMode]);
 
   useEffect(() => {
     if (!isCalendarOpen || !userId) {
