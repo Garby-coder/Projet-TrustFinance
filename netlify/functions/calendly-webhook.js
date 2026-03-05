@@ -23,8 +23,19 @@ const SESSION_TEMPLATES = [
   },
 ];
 
+const BASE_URLS = {
+  "Présentation de l’accompagnement & Bilan initial.": process.env.VITE_CALENDLY_SUBJECT_1_URL,
+  "Optimisation et structuration bancaire.": process.env.VITE_CALENDLY_SUBJECT_2_URL,
+  "Les bases fondamentales de l’investissement.": process.env.VITE_CALENDLY_SUBJECT_3_URL,
+  "Structurer son investissement intelligemment.": process.env.VITE_CALENDLY_SUBJECT_4_URL,
+  "Comprendre les marchés financiers et le système bancaire.":
+    process.env.VITE_CALENDLY_SUBJECT_5_URL,
+};
+const FREE_BASE_URL = process.env.VITE_CALENDLY_FREE_URL;
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_SIGNATURE_AGE_SECONDS = 300;
+const CANCEL_MATCH_WINDOW_MINUTES = 5;
 
 function jsonResponse(statusCode, payload) {
   return {
@@ -149,6 +160,16 @@ function getStartAt(payload) {
   }
 
   const normalized = value.trim();
+  return normalized || null;
+}
+
+function getBaseBookingUrl(theme) {
+  const source = theme ? BASE_URLS[theme] : FREE_BASE_URL;
+  if (typeof source !== "string") {
+    return null;
+  }
+
+  const normalized = source.trim();
   return normalized || null;
 }
 
@@ -298,21 +319,70 @@ async function insertSession(supabaseUrl, serviceRoleKey, payload) {
 }
 
 async function patchCanceledSessionByUserAndStartAt({ supabaseUrl, serviceRoleKey, userId, startAt }) {
+  const targetTime = new Date(startAt).getTime();
+  if (Number.isNaN(targetTime)) {
+    return null;
+  }
+
+  const minIso = new Date(targetTime - CANCEL_MATCH_WINDOW_MINUTES * 60 * 1000).toISOString();
+  const maxIso = new Date(targetTime + CANCEL_MATCH_WINDOW_MINUTES * 60 * 1000).toISOString();
+
+  const rows = await supabaseRequest({
+    supabaseUrl,
+    serviceRoleKey,
+    table: "sessions",
+    query: {
+      select: "id,scheduled_at,theme,booking_url",
+      user_id: `eq.${userId}`,
+      status: "eq.planned",
+      and: `(scheduled_at.gte.${minIso},scheduled_at.lte.${maxIso})`,
+      order: "scheduled_at.asc",
+      limit: "20",
+    },
+  });
+
+  const matches = Array.isArray(rows) ? rows : [];
+  if (matches.length === 0) {
+    return null;
+  }
+
+  let bestMatch = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const session of matches) {
+    const sessionTime = new Date(session?.scheduled_at ?? "").getTime();
+    if (Number.isNaN(sessionTime)) {
+      continue;
+    }
+
+    const delta = Math.abs(sessionTime - targetTime);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      bestMatch = session;
+    }
+  }
+
+  if (!bestMatch?.id) {
+    return null;
+  }
+
+  const baseUrl = getBaseBookingUrl(bestMatch.theme) || bestMatch.booking_url || null;
+
   await supabaseRequest({
     supabaseUrl,
     serviceRoleKey,
     table: "sessions",
     method: "PATCH",
     query: {
-      user_id: `eq.${userId}`,
-      status: "eq.planned",
-      scheduled_at: `eq.${startAt}`,
+      id: `eq.${bestMatch.id}`,
     },
     body: {
       scheduled_at: null,
+      booking_url: baseUrl,
     },
     prefer: "return=minimal",
   });
+
+  return bestMatch.id;
 }
 
 async function handleInviteeCreated({ supabaseUrl, serviceRoleKey, userId, payload }) {
