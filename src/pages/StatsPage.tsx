@@ -45,6 +45,16 @@ type CalendlyUser = {
   id: string;
   email?: string | null;
   user_metadata?: Record<string, unknown> | null;
+  created_at?: string | null;
+};
+
+type ProfileEngagement = {
+  xp: number;
+  streak_current: number;
+  streak_best: number;
+  cadence_target: number;
+  cadence_unit: "day" | "week";
+  period_progress: number;
 };
 
 type TaskItem = {
@@ -83,6 +93,15 @@ type ModuleFilter = "all" | "todo" | "done";
 const CALENDLY_FREE_FALLBACK_URL =
   (import.meta.env.VITE_CALENDLY_FREE_URL ?? "").trim() ||
   "https://calendly.com/trustfinanceam/reserve-ton-appel-avec-matheo-aalberg-clone";
+
+const EMPTY_PROFILE_ENGAGEMENT: ProfileEngagement = {
+  xp: 0,
+  streak_current: 0,
+  streak_best: 0,
+  cadence_target: 1,
+  cadence_unit: "week",
+  period_progress: 0,
+};
 
 function parseDate(dateValue: string | null | undefined) {
   if (!dateValue) {
@@ -408,8 +427,9 @@ export default function StatsPage() {
   const [tasksModalTab, setTasksModalTab] = useState<"todo" | "done">("todo");
   const [tasksModalError, setTasksModalError] = useState("");
   const [taskTogglePendingId, setTaskTogglePendingId] = useState<string | null>(null);
-  const [showBadgesModal, setShowBadgesModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(false);
+  const [profileEngagement, setProfileEngagement] = useState<ProfileEngagement>(EMPTY_PROFILE_ENGAGEMENT);
   const moduleRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const didAutoOpen = useRef(false);
 
@@ -421,6 +441,46 @@ export default function StatsPage() {
 
     moduleRefs.current[selectedModuleId]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [expandedModuleId]);
+
+  useEffect(() => {
+    function handleEngagementUpdate(event: Event) {
+      const detail = (event as CustomEvent<{
+        newXp?: number;
+        streak_current?: number;
+        streak_best?: number;
+        period_progress?: number;
+        cadence_target?: number;
+        cadence_unit?: "day" | "week";
+      }>).detail;
+
+      if (!detail || typeof detail !== "object") {
+        return;
+      }
+
+      if (typeof detail.streak_current === "number") {
+        setStreakCurrent(Math.max(0, detail.streak_current));
+      }
+
+      setProfileEngagement((current) => {
+        return {
+          xp: typeof detail.newXp === "number" ? Math.max(0, detail.newXp) : current.xp,
+          streak_current:
+            typeof detail.streak_current === "number" ? Math.max(0, detail.streak_current) : current.streak_current,
+          streak_best: typeof detail.streak_best === "number" ? Math.max(0, detail.streak_best) : current.streak_best,
+          period_progress:
+            typeof detail.period_progress === "number" ? Math.max(0, detail.period_progress) : current.period_progress,
+          cadence_target:
+            typeof detail.cadence_target === "number" ? Math.max(1, detail.cadence_target) : current.cadence_target,
+          cadence_unit: detail.cadence_unit === "day" ? "day" : current.cadence_unit,
+        };
+      });
+    }
+
+    window.addEventListener("tf:engagement", handleEngagementUpdate as EventListener);
+    return () => {
+      window.removeEventListener("tf:engagement", handleEngagementUpdate as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -445,6 +505,7 @@ export default function StatsPage() {
         ? {
             id: userData.user.id,
             email: userData.user.email ?? null,
+            created_at: userData.user.created_at ?? null,
             user_metadata:
               userData.user.user_metadata && typeof userData.user.user_metadata === "object"
                 ? (userData.user.user_metadata as Record<string, unknown>)
@@ -463,7 +524,7 @@ export default function StatsPage() {
 
       const { data: userEngagementRow, error: userEngagementError } = await supabase
         .from("user_engagement")
-        .select("streak_current")
+        .select("xp,streak_current,streak_best,cadence_target,cadence_unit,period_progress")
         .eq("user_id", currentUserId)
         .maybeSingle();
 
@@ -475,9 +536,20 @@ export default function StatsPage() {
         if (!isMissingUserEngagementTable(userEngagementError)) {
           setBadgeLoadError(`Impossible de charger le badge actuel : ${userEngagementError.message}`);
         }
+        setProfileEngagement(EMPTY_PROFILE_ENGAGEMENT);
         setStreakCurrent(0);
       } else {
-        setStreakCurrent(Number(userEngagementRow?.streak_current ?? 0));
+        const nextProfileEngagement: ProfileEngagement = {
+          xp: Math.max(0, Number(userEngagementRow?.xp ?? 0)),
+          streak_current: Math.max(0, Number(userEngagementRow?.streak_current ?? 0)),
+          streak_best: Math.max(0, Number(userEngagementRow?.streak_best ?? 0)),
+          cadence_target: Math.max(1, Number(userEngagementRow?.cadence_target ?? 1)),
+          cadence_unit: userEngagementRow?.cadence_unit === "day" ? "day" : "week",
+          period_progress: Math.max(0, Number(userEngagementRow?.period_progress ?? 0)),
+        };
+
+        setProfileEngagement(nextProfileEngagement);
+        setStreakCurrent(nextProfileEngagement.streak_current);
       }
 
       const { data: modulesData, error: modulesError } = await supabase
@@ -978,6 +1050,34 @@ export default function StatsPage() {
   )
     .map((badgeId) => badges.find((badge) => badge.id === badgeId))
     .find((badge) => badge?.unlocked === true) ?? null;
+
+  const xpPerLevel = 4000;
+  const profileXp = Math.max(0, profileEngagement.xp);
+  const profileLevel = Math.floor(profileXp / xpPerLevel) + 1;
+  const xpInLevel = profileXp % xpPerLevel;
+  const xpProgressPercent = Math.max(0, Math.min(100, Math.round((xpInLevel / xpPerLevel) * 100)));
+
+  const totalLessonsCount = moduleLessons.length;
+  const completedLessonsCount = Object.values(completedByLessonId).filter((value) => value === true).length;
+  const trainingProgressPercent = totalLessonsCount > 0 ? Math.round((completedLessonsCount / totalLessonsCount) * 100) : 0;
+
+  const profileMetadata = currentUser?.user_metadata ?? {};
+  const profileName =
+    (typeof profileMetadata.full_name === "string" ? profileMetadata.full_name.trim() : "") ||
+    (typeof profileMetadata.name === "string" ? profileMetadata.name.trim() : "") ||
+    (currentUser?.email ? currentUser.email.split("@")[0] : "Utilisateur");
+  const profileAvatarUrl =
+    typeof profileMetadata.avatar_url === "string" && profileMetadata.avatar_url.trim().length > 0
+      ? profileMetadata.avatar_url.trim()
+      : null;
+  const memberSinceLabel =
+    currentUser?.created_at && parseDate(currentUser.created_at)
+      ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(new Date(currentUser.created_at))
+      : "Inconnu";
+
+  const cadenceUnitLabel = profileEngagement.cadence_unit === "day" ? "jour" : "semaine";
+  const badgesUnlocked = badges.filter((badge) => badge.unlocked);
+  const badgesLocked = badges.filter((badge) => !badge.unlocked);
 
   const sessionsByDateKey: Record<string, SessionItem[]> = {};
   for (const session of sessions) {
@@ -1844,7 +1944,7 @@ export default function StatsPage() {
                 <button
                   type="button"
                   className="card-button tf-card tf-quickCard"
-                  onClick={() => setShowBadgesModal(true)}
+                  onClick={() => setShowProfileModal(true)}
                 >
                   <span className="tf-quickIcon" aria-hidden="true">◍</span>
                   <div className="tf-quickText">
@@ -2109,26 +2209,139 @@ export default function StatsPage() {
         </div>
       )}
 
-      {showBadgesModal && (
-        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowBadgesModal(false)}>
-          <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(820px, 100%)", maxHeight: "85vh" }}>
+      {showProfileModal && (
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowProfileModal(false)}>
+          <div className="modal-panel tf-modalPanel tf-card" onClick={(event) => event.stopPropagation()} style={{ width: "min(1080px, 100%)", maxHeight: "90vh" }}>
             <div className="modal-header">
               <div>
-                <h3 className="modal-title tf-title">Tous mes badges</h3>
+                <h3 className="modal-title tf-title">Mon Profil</h3>
+                <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
+                  Suis ta progression, tes streaks et tes badges débloqués.
+                </p>
               </div>
-              <button type="button" className="btn" onClick={() => setShowBadgesModal(false)}>
-                Fermer
+              <button type="button" className="btn" aria-label="Fermer le profil" onClick={() => setShowProfileModal(false)}>
+                ×
               </button>
             </div>
 
-            <div className="tf-scroll" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, maxHeight: "65vh" }}>
-              {badges.map((badge) => (
-                <article key={badge.id} className="card tf-card" style={badge.unlocked ? undefined : { opacity: 0.6 }}>
-                  <p className="card-meta tf-chip">{badge.unlocked ? "Débloqué" : "À débloquer"}</p>
-                  <h4 className="card-title tf-title">{badge.name}</h4>
-                  <p className="card-text">{badge.conditionText}</p>
-                </article>
-              ))}
+            <div className="tf-scroll" style={{ maxHeight: "72vh" }}>
+              <div className="tf-profileGrid">
+                <div className="tf-profileCol">
+                  <article className="tf-profileCard">
+                    <div className="tf-profileHeader">
+                      <div className="tf-profileAvatarWrap">
+                        {profileAvatarUrl ? (
+                          <img src={profileAvatarUrl} alt={profileName} className="tf-profileAvatar" />
+                        ) : (
+                          <div className="tf-profileAvatar tf-profileAvatar--fallback" aria-hidden="true">
+                            {profileName.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="tf-profileLevelBadge">Niv. {profileLevel}</span>
+                      </div>
+                      <div>
+                        <h4 className="tf-title" style={{ margin: 0 }}>{profileName}</h4>
+                        <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>{currentUser?.email ?? "Email non disponible"}</p>
+                        <p className="tf-muted" style={{ margin: "6px 0 0" }}>Membre depuis {memberSinceLabel}</p>
+                      </div>
+                    </div>
+
+                    <div className="tf-profileBlock">
+                      <div className="tf-profileRow">
+                        <span className="tf-subtitle">XP totale</span>
+                        <strong className="tf-title">{profileXp.toLocaleString("fr-FR")} XP</strong>
+                      </div>
+                      <div className="tf-profileProgress">
+                        <div className="tf-profileProgressFill" style={{ width: `${xpProgressPercent}%` }} />
+                      </div>
+                      <p className="tf-muted" style={{ margin: 0 }}>
+                        Niveau {profileLevel} · {xpInLevel.toLocaleString("fr-FR")} / {xpPerLevel.toLocaleString("fr-FR")} XP
+                      </p>
+                    </div>
+                  </article>
+
+                  <article className="tf-streakCard">
+                    <h4 className="tf-title" style={{ margin: 0 }}>Streak</h4>
+                    <div className="tf-profileStatsGrid">
+                      <div className="tf-profileStatItem">
+                        <span className="tf-muted">Actuelle</span>
+                        <strong className="tf-title">{profileEngagement.streak_current}</strong>
+                      </div>
+                      <div className="tf-profileStatItem">
+                        <span className="tf-muted">Record</span>
+                        <strong className="tf-title">{profileEngagement.streak_best}</strong>
+                      </div>
+                    </div>
+                    <p className="tf-subtitle" style={{ margin: 0 }}>
+                      Objectif {profileEngagement.period_progress} / {profileEngagement.cadence_target} par {cadenceUnitLabel}
+                    </p>
+                  </article>
+
+                  <article className="tf-statsCard">
+                    <h4 className="tf-title" style={{ margin: 0 }}>Statistiques</h4>
+                    <div className="tf-profileStatsGrid">
+                      <div className="tf-profileStatItem">
+                        <span className="tf-muted">Leçons terminées</span>
+                        <strong className="tf-title">{completedLessonsCount}</strong>
+                      </div>
+                      <div className="tf-profileStatItem">
+                        <span className="tf-muted">Quiz réussis</span>
+                        <strong className="tf-title">{quizPassedCount}</strong>
+                      </div>
+                      <div className="tf-profileStatItem">
+                        <span className="tf-muted">Séances coaching</span>
+                        <strong className="tf-title">{coachingCompletedCount}</strong>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+
+                <div className="tf-profileCol">
+                  <article className="tf-trainingProgressCard">
+                    <h4 className="tf-title" style={{ margin: 0 }}>Progression formation</h4>
+                    <div className="tf-profileRow">
+                      <span className="tf-subtitle">Avancement global</span>
+                      <strong className="tf-title">{trainingProgressPercent}%</strong>
+                    </div>
+                    <div className="tf-profileProgress">
+                      <div className="tf-profileProgressFill" style={{ width: `${trainingProgressPercent}%` }} />
+                    </div>
+                    <p className="tf-muted" style={{ margin: 0 }}>
+                      {completedLessonsCount} / {totalLessonsCount} leçons terminées
+                    </p>
+                  </article>
+
+                  <article className="tf-badgesCard">
+                    <h4 className="tf-title" style={{ margin: 0 }}>Badges</h4>
+
+                    <div className="tf-profileBadgesSection">
+                      <p className="tf-profileBadgesTitle">DÉBLOQUÉS</p>
+                      <div className="tf-profileBadgesGrid">
+                        {badgesUnlocked.length === 0 && <p className="tf-muted">Aucun badge débloqué pour l’instant.</p>}
+                        {badgesUnlocked.map((badge) => (
+                          <article key={badge.id} className="tf-profileBadge">
+                            <p className="tf-profileBadgeName">{badge.name}</p>
+                            <p className="tf-profileBadgeText">{badge.reachedText}</p>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="tf-profileBadgesSection">
+                      <p className="tf-profileBadgesTitle">À DÉBLOQUER</p>
+                      <div className="tf-profileBadgesGrid">
+                        {badgesLocked.length === 0 && <p className="tf-muted">Tous les badges sont débloqués.</p>}
+                        {badgesLocked.map((badge) => (
+                          <article key={badge.id} className="tf-profileBadge tf-profileBadge--locked">
+                            <p className="tf-profileBadgeName">{badge.name}</p>
+                            <p className="tf-profileBadgeText">{badge.conditionText}</p>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </div>
             </div>
           </div>
         </div>
