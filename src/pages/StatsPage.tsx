@@ -108,6 +108,13 @@ type PersistedStatsState = {
 const CALENDLY_FREE_FALLBACK_URL =
   (import.meta.env.VITE_CALENDLY_FREE_URL ?? "").trim() ||
   "https://calendly.com/trustfinanceam/reserve-ton-appel-avec-matheo-aalberg-clone";
+const SUBJECT_BOOKING_URLS: Record<string, string | undefined> = {
+  "Présentation de l’accompagnement & Bilan initial.": import.meta.env.VITE_CALENDLY_SUBJECT_1_URL,
+  "Optimisation et structuration bancaire.": import.meta.env.VITE_CALENDLY_SUBJECT_2_URL,
+  "Les bases fondamentales de l’investissement.": import.meta.env.VITE_CALENDLY_SUBJECT_3_URL,
+  "Structurer son investissement intelligemment.": import.meta.env.VITE_CALENDLY_SUBJECT_4_URL,
+  "Comprendre les marchés financiers et le système bancaire.": import.meta.env.VITE_CALENDLY_SUBJECT_5_URL,
+};
 const STORAGE_KEY = "tf:statsState";
 
 const COACH_THEME_ORDER = [
@@ -250,6 +257,32 @@ function buildCalendlyUrl(baseUrl: string, user: CalendlyUser | null) {
   } catch {
     return baseUrl;
   }
+}
+
+function getBaseBookingUrl(theme: string | null) {
+  const normalizedTheme = (theme ?? "").trim();
+  if (!normalizedTheme) {
+    return CALENDLY_FREE_FALLBACK_URL;
+  }
+
+  const mapped = SUBJECT_BOOKING_URLS[normalizedTheme]?.trim();
+  return mapped || CALENDLY_FREE_FALLBACK_URL;
+}
+
+function resolveSessionBookingUrl(
+  session: Pick<SessionItem, "status" | "scheduled_at" | "theme" | "booking_url"> | null | undefined
+) {
+  if (!session) {
+    return null;
+  }
+
+  const isPlanned = session.status?.toLowerCase() === "planned";
+  const isUnscheduled = parseDate(session.scheduled_at) === null;
+  if (isPlanned && isUnscheduled) {
+    return getBaseBookingUrl(session.theme);
+  }
+
+  return session.booking_url;
 }
 
 function formatDateKeyReadable(dateKey: string) {
@@ -1989,8 +2022,8 @@ export default function StatsPage() {
             <button
               type="button"
               className="tf-btn tf-btn--accent"
-              onClick={() => openCalendlyWindow(selectedCoachSession.booking_url)}
-              disabled={!isValidHttpUrl(selectedCoachSession.booking_url)}
+              onClick={() => openCalendlyWindow(resolveSessionBookingUrl(selectedCoachSession))}
+              disabled={!isValidHttpUrl(resolveSessionBookingUrl(selectedCoachSession))}
             >
               Réserver cette séance
             </button>
@@ -2009,8 +2042,8 @@ export default function StatsPage() {
             <button
               type="button"
               className="tf-btn tf-btn--planned"
-              onClick={() => openCalendlyWindow(selectedCoachSession.booking_url)}
-              disabled={!isValidHttpUrl(selectedCoachSession.booking_url)}
+              onClick={() => openCalendlyWindow(resolveSessionBookingUrl(selectedCoachSession))}
+              disabled={!isValidHttpUrl(resolveSessionBookingUrl(selectedCoachSession))}
             >
               Reprogrammer la séance
             </button>
@@ -3092,7 +3125,7 @@ export default function StatsPage() {
                       <p className="card-text">{session.objective ?? "Objectif non renseigné."}</p>
                       {canReplan && (
                         <a
-                          href={buildCalendlyUrl(session.booking_url ?? "#", currentUser)}
+                          href={buildCalendlyUrl(resolveSessionBookingUrl(session) ?? "#", currentUser)}
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-primary card-action"
@@ -3429,7 +3462,7 @@ export default function StatsPage() {
                             <button
                               type="button"
                               className="btn btn-primary card-action"
-                              onClick={() => openCalendlyWindow(session.booking_url)}
+                              onClick={() => openCalendlyWindow(resolveSessionBookingUrl(session))}
                             >
                               Replanifier
                             </button>
