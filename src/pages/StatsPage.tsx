@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { registerEngagementAction } from "../lib/engagement";
 import { supabase } from "../lib/supabase";
 
@@ -474,6 +474,57 @@ export default function StatsPage() {
   const moduleRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const didAutoOpen = useRef(false);
 
+  const fetchSessions = useCallback(
+    async (targetUserId: string | null, shouldApply: () => boolean = () => true) => {
+      if (!targetUserId || !shouldApply()) {
+        return;
+      }
+
+      const primarySelect =
+        "id,user_id,status,order_index,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
+      const fallbackSelect = "id,user_id,status,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
+
+      let disableOrderIndex = false;
+      let { data: sessionsData, error: sessionsError } = await supabase
+        .from("sessions")
+        .select(primarySelect)
+        .eq("user_id", targetUserId)
+        .order("scheduled_at", { ascending: true });
+
+      if (sessionsError && isOrderIndexMissingColumnError(sessionsError.message)) {
+        disableOrderIndex = true;
+        const fallbackResult = await supabase
+          .from("sessions")
+          .select(fallbackSelect)
+          .eq("user_id", targetUserId)
+          .order("scheduled_at", { ascending: true });
+        sessionsData = fallbackResult.data as SessionItem[] | null;
+        sessionsError = fallbackResult.error;
+      }
+
+      if (!shouldApply()) {
+        return;
+      }
+
+      if (sessionsError) {
+        if (isMissingSessionsTable(sessionsError)) {
+          setSessionsLoadError("La table des séances est indisponible pour le moment.");
+        } else {
+          setSessionsLoadError(`Impossible de charger les séances : ${sessionsError.message}`);
+        }
+        return;
+      }
+
+      const normalizedSessions = disableOrderIndex
+        ? ((sessionsData ?? []) as Array<Omit<SessionItem, "order_index">>).map((session) => ({ ...session, order_index: null }))
+        : ((sessionsData ?? []) as SessionItem[]);
+
+      setSessionsLoadError("");
+      setSessions(normalizedSessions);
+    },
+    []
+  );
+
   useEffect(() => {
     const selectedModuleId = expandedModuleId;
     if (!selectedModuleId) {
@@ -737,44 +788,7 @@ export default function StatsPage() {
         }
       }
 
-      const primarySelect =
-        "id,user_id,status,order_index,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
-      const fallbackSelect = "id,user_id,status,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
-
-      let disableOrderIndex = false;
-      let { data: sessionsData, error: sessionsError } = await supabase
-        .from("sessions")
-        .select(primarySelect)
-        .eq("user_id", currentUserId)
-        .order("scheduled_at", { ascending: true });
-
-      if (sessionsError && isOrderIndexMissingColumnError(sessionsError.message)) {
-        disableOrderIndex = true;
-        const fallbackResult = await supabase
-          .from("sessions")
-          .select(fallbackSelect)
-          .eq("user_id", currentUserId)
-          .order("scheduled_at", { ascending: true });
-        sessionsData = fallbackResult.data as SessionItem[] | null;
-        sessionsError = fallbackResult.error;
-      }
-
-      if (!isMounted) {
-        return;
-      }
-
-      if (sessionsError) {
-        if (isMissingSessionsTable(sessionsError)) {
-          setSessionsLoadError("La table des séances est indisponible pour le moment.");
-        } else {
-          setSessionsLoadError(`Impossible de charger les séances : ${sessionsError.message}`);
-        }
-      } else {
-        const normalizedSessions = disableOrderIndex
-          ? ((sessionsData ?? []) as Array<Omit<SessionItem, "order_index">>).map((session) => ({ ...session, order_index: null }))
-          : ((sessionsData ?? []) as SessionItem[]);
-        setSessions(normalizedSessions);
-      }
+      await fetchSessions(currentUserId, () => isMounted);
 
       let tasksData: TaskItem[] | null = null;
       let tasksError: { code?: string; message: string } | null = null;
@@ -845,7 +859,7 @@ export default function StatsPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [fetchSessions]);
 
   const modulesSorted = [...modules].sort((a, b) => a.order_index - b.order_index);
   const unlockedByModuleId: Record<string, boolean> = {};
@@ -1615,52 +1629,37 @@ export default function StatsPage() {
       return;
     }
 
-    let isMounted = true;
+    void fetchSessions(userId);
+  }, [fetchSessions, userId, viewMode]);
 
-    (async () => {
-      const primarySelect =
-        "id,user_id,status,order_index,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
-      const fallbackSelect = "id,user_id,status,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
+  useEffect(() => {
+    if (viewMode !== "coaching" || !userId) {
+      return;
+    }
 
-      let disableOrderIndex = false;
-      let { data: sessionsData, error: sessionsError } = await supabase
-        .from("sessions")
-        .select(primarySelect)
-        .eq("user_id", userId)
-        .order("scheduled_at", { ascending: true });
+    const handleFocus = () => {
+      void fetchSessions(userId);
+    };
 
-      if (sessionsError && isOrderIndexMissingColumnError(sessionsError.message)) {
-        disableOrderIndex = true;
-        const fallbackResult = await supabase
-          .from("sessions")
-          .select(fallbackSelect)
-          .eq("user_id", userId)
-          .order("scheduled_at", { ascending: true });
-        sessionsData = fallbackResult.data as SessionItem[] | null;
-        sessionsError = fallbackResult.error;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void fetchSessions(userId);
       }
+    };
 
-      if (!isMounted) {
-        return;
-      }
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-      if (sessionsError) {
-        if (!isMissingSessionsTable(sessionsError)) {
-          setSessionsLoadError(`Impossible de charger les séances : ${sessionsError.message}`);
-        }
-        return;
-      }
-
-      const normalizedSessions = disableOrderIndex
-        ? ((sessionsData ?? []) as Array<Omit<SessionItem, "order_index">>).map((session) => ({ ...session, order_index: null }))
-        : ((sessionsData ?? []) as SessionItem[]);
-      setSessions(normalizedSessions);
-    })();
+    const intervalId = window.setInterval(() => {
+      void fetchSessions(userId);
+    }, 15000);
 
     return () => {
-      isMounted = false;
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(intervalId);
     };
-  }, [userId, viewMode]);
+  }, [fetchSessions, userId, viewMode]);
 
   function renderActivePanelBody() {
     if (!activeModule) {
