@@ -332,7 +332,7 @@ async function patchCanceledSessionByUserAndStartAt({ supabaseUrl, serviceRoleKe
     serviceRoleKey,
     table: "sessions",
     query: {
-      select: "id,scheduled_at,theme,booking_url",
+      select: "id,scheduled_at",
       user_id: `eq.${userId}`,
       status: "eq.planned",
       and: `(scheduled_at.gte.${minIso},scheduled_at.lte.${maxIso})`,
@@ -365,8 +365,6 @@ async function patchCanceledSessionByUserAndStartAt({ supabaseUrl, serviceRoleKe
     return null;
   }
 
-  const baseUrl = getBaseBookingUrl(bestMatch.theme) || bestMatch.booking_url || null;
-
   await supabaseRequest({
     supabaseUrl,
     serviceRoleKey,
@@ -377,7 +375,6 @@ async function patchCanceledSessionByUserAndStartAt({ supabaseUrl, serviceRoleKe
     },
     body: {
       scheduled_at: null,
-      booking_url: baseUrl,
     },
     prefer: "return=minimal",
   });
@@ -496,13 +493,20 @@ exports.handler = async function handler(event) {
       return jsonResponse(200, { ok: true, ignored: true });
     }
 
+    let matchedSessionId = null;
     try {
-      await patchCanceledSessionByUserAndStartAt({
+      matchedSessionId = await patchCanceledSessionByUserAndStartAt({
         supabaseUrl,
         serviceRoleKey,
         userId,
         startAt,
       });
+      console.log("invitee.canceled", { userId, startAt, matchedSessionId });
+
+      if (!matchedSessionId) {
+        console.log("no_session_match", { userId, startAt });
+        return jsonResponse(200, { ok: true, ignored: true });
+      }
     } catch (error) {
       console.error("Erreur webhook Calendly invitee.canceled.", error);
       return jsonResponse(200, { ok: true, ignored: true });
