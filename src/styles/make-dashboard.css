@@ -138,6 +138,70 @@
   gap: 12px;
 }
 
+.tf-app .card-button.tf-academyCard {
+  display: flex;
+  align-items: center;
+}
+
+.tf-topSelectRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.tf-topSelectText {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.tf-viewModeMenuWrap {
+  position: relative;
+}
+
+.tf-viewModeMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 60;
+  width: 240px;
+  border-radius: var(--radiusSm);
+  border: 1px solid var(--border);
+  background: rgba(17, 17, 17, 0.98);
+  box-shadow: var(--shadow);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.tf-viewModeMenuItem {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text2);
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+
+.tf-viewModeMenuItem:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.tf-viewModeMenuItem.isActive {
+  color: var(--text);
+  border-color: rgba(175, 135, 50, 0.45);
+  background: rgba(175, 135, 50, 0.2);
+}
+
 .tf-quickCard--start {
   background: linear-gradient(135deg, rgba(175, 135, 50, 0.3) 0%, rgba(108, 81, 28, 0.46) 55%, rgba(72, 54, 19, 0.62) 100%);
   border-color: rgba(175, 135, 50, 0.55);
@@ -312,6 +376,11 @@ a.tf-startCta:active,
   gap: 0;
 }
 
+.tf-coachTabs,
+.tf-coachTopicToggle {
+  width: 100%;
+}
+
 .tf-moduleCardFixed {
   height: 104px;
 }
@@ -428,6 +497,54 @@ a.tf-startCta:active,
 .tf-moduleBadge--done,
 .tf-moduleBadge--inprogress {
   white-space: nowrap;
+}
+
+.tf-sessionCard {
+  height: auto;
+  min-height: 104px;
+}
+
+.tf-sessionCard .tf-moduleTitle {
+  font-size: 16px;
+}
+
+.tf-sessionDateMeta {
+  font-size: 12px;
+  color: var(--text2);
+  text-align: right;
+}
+
+.tf-sessionBadge {
+  white-space: nowrap;
+}
+
+.tf-sessionBadge--todo {
+  border: 1px solid rgba(175, 135, 50, 0.35);
+  background: rgba(175, 135, 50, 0.12);
+  color: rgba(255, 235, 205, 0.95);
+}
+
+.tf-sessionBadge--planned {
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.14);
+  color: rgba(210, 228, 255, 0.95);
+}
+
+.tf-sessionBadge--done {
+  border: 1px solid rgba(40, 209, 124, 0.35);
+  background: rgba(40, 209, 124, 0.14);
+  color: rgba(210, 255, 235, 0.95);
+}
+
+.tf-coachHeroIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  border: 1px solid rgba(175, 135, 50, 0.35);
+  background: rgba(175, 135, 50, 0.14);
 }
 
 .tf-clamp2 {
@@ -617,6 +734,12 @@ a.tf-startCta:active,
   color: rgba(210, 255, 235, 0.95);
 }
 
+.tf-chip--planned {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.14);
+  color: rgba(210, 228, 255, 0.95);
+}
+
 .tf-app .section-title,
 .tf-app .subsection-title,
 .tf-app .modal-title,
@@ -761,6 +884,12 @@ a.tf-startCta:active,
   border-color: rgba(40, 209, 124, 0.35);
   background: rgba(40, 209, 124, 0.16);
   color: rgba(200, 255, 230, 0.95);
+}
+
+.tf-app .tf-btn--planned {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.18);
+  color: rgba(222, 236, 255, 0.95);
 }
 
 .tf-app .btn:disabled,

@@ -24,6 +24,7 @@ type ModuleLesson = {
 
 type SessionItem = {
   id: string;
+  user_id: string | null;
   status: string | null;
   order_index: number | null;
   created_at: string | null;
@@ -31,6 +32,9 @@ type SessionItem = {
   objective: string | null;
   booking_url: string | null;
   scheduled_at: string | null;
+  summary: string | null;
+  recording_url: string | null;
+  transcript: string | null;
 };
 
 type CalendarSessionItem = {
@@ -93,6 +97,14 @@ type ModuleFilter = "all" | "todo" | "done";
 const CALENDLY_FREE_FALLBACK_URL =
   (import.meta.env.VITE_CALENDLY_FREE_URL ?? "").trim() ||
   "https://calendly.com/trustfinanceam/reserve-ton-appel-avec-matheo-aalberg-clone";
+
+const COACH_THEME_ORDER = [
+  "Présentation de l’accompagnement & Bilan initial.",
+  "Optimisation et structuration bancaire.",
+  "Les bases fondamentales de l’investissement.",
+  "Structurer son investissement intelligemment.",
+  "Comprendre les marchés financiers et le système bancaire.",
+] as const;
 
 const EMPTY_PROFILE_ENGAGEMENT: ProfileEngagement = {
   xp: 0,
@@ -402,6 +414,11 @@ export default function StatsPage() {
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"lessons" | "quiz">("lessons");
+  const [viewMode, setViewMode] = useState<"accompagnement" | "coaching">("accompagnement");
+  const [coachTopicFilter, setCoachTopicFilter] = useState<"with" | "without">("with");
+  const [coachTimeFilter, setCoachTimeFilter] = useState<"all" | "upcoming" | "past">("all");
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [showViewModeMenu, setShowViewModeMenu] = useState(false);
   const [moduleFilter, setModuleFilter] = useState<ModuleFilter>("all");
 
   const [quizLoading, setQuizLoading] = useState(false);
@@ -441,6 +458,34 @@ export default function StatsPage() {
 
     moduleRefs.current[selectedModuleId]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [expandedModuleId]);
+
+  useEffect(() => {
+    if (!showViewModeMenu) {
+      return;
+    }
+
+    function handleDocumentClick(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".tf-viewModeMenuWrap")) {
+        return;
+      }
+
+      setShowViewModeMenu(false);
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowViewModeMenu(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showViewModeMenu]);
 
   useEffect(() => {
     function handleEngagementUpdate(event: Event) {
@@ -668,8 +713,9 @@ export default function StatsPage() {
         }
       }
 
-      const primarySelect = "id,status,order_index,created_at,theme,objective,booking_url,scheduled_at";
-      const fallbackSelect = "id,status,created_at,theme,objective,booking_url,scheduled_at";
+      const primarySelect =
+        "id,user_id,status,order_index,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
+      const fallbackSelect = "id,user_id,status,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
 
       let disableOrderIndex = false;
       let { data: sessionsData, error: sessionsError } = await supabase
@@ -1182,6 +1228,104 @@ export default function StatsPage() {
     : null;
   const canMarkLessonDone = activeTab === "lessons" && !!activeLesson && isActiveModuleUnlocked && !isActiveLessonCompleted;
 
+  const coachThemeOrderMap = new Map<string, number>(COACH_THEME_ORDER.map((theme, index) => [theme, index]));
+  const coachBaseSessions = sessions.filter((session) => {
+    const hasTheme = !!session.theme?.trim();
+    return coachTopicFilter === "with" ? hasTheme : !hasTheme;
+  });
+
+  const coachSessionsFilteredByTime = coachBaseSessions.filter((session) => {
+    if (coachTimeFilter === "all") {
+      return true;
+    }
+
+    const scheduledAt = parseDate(session.scheduled_at);
+    if (coachTimeFilter === "upcoming") {
+      return session.status?.toLowerCase() === "planned" && scheduledAt !== null && scheduledAt >= now;
+    }
+
+    return session.status?.toLowerCase() === "completed" || (scheduledAt !== null && scheduledAt < now);
+  });
+
+  const coachSessionsSorted = [...coachSessionsFilteredByTime].sort((a, b) => {
+    if (coachTopicFilter === "with") {
+      const rankA = a.theme ? (coachThemeOrderMap.get(a.theme) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+      const rankB = b.theme ? (coachThemeOrderMap.get(b.theme) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+
+      const timeA = parseDate(a.scheduled_at);
+      const timeB = parseDate(b.scheduled_at);
+      if (timeA !== null && timeB !== null && timeA !== timeB) {
+        return timeA - timeB;
+      }
+      if (timeA === null && timeB !== null) {
+        return 1;
+      }
+      if (timeA !== null && timeB === null) {
+        return -1;
+      }
+
+      const createdAtA = parseDate(a.created_at);
+      const createdAtB = parseDate(b.created_at);
+      if (createdAtA !== null && createdAtB !== null && createdAtA !== createdAtB) {
+        return createdAtA - createdAtB;
+      }
+      if (createdAtA === null && createdAtB !== null) {
+        return 1;
+      }
+      if (createdAtA !== null && createdAtB === null) {
+        return -1;
+      }
+
+      return a.id.localeCompare(b.id, "fr");
+    }
+
+    const timeA = parseDate(a.scheduled_at);
+    const timeB = parseDate(b.scheduled_at);
+    if (timeA !== null && timeB !== null && timeA !== timeB) {
+      return timeB - timeA;
+    }
+    if (timeA === null && timeB !== null) {
+      return 1;
+    }
+    if (timeA !== null && timeB === null) {
+      return -1;
+    }
+
+    const createdAtA = parseDate(a.created_at);
+    const createdAtB = parseDate(b.created_at);
+    if (createdAtA !== null && createdAtB !== null && createdAtA !== createdAtB) {
+      return createdAtB - createdAtA;
+    }
+    if (createdAtA === null && createdAtB !== null) {
+      return 1;
+    }
+    if (createdAtA !== null && createdAtB === null) {
+      return -1;
+    }
+
+    return b.id.localeCompare(a.id, "fr");
+  });
+
+  const selectedCoachSession =
+    (selectedSessionId ? coachSessionsSorted.find((session) => session.id === selectedSessionId) : null) ?? null;
+
+  const selectedCoachSessionScheduledAt = parseDate(selectedCoachSession?.scheduled_at ?? null);
+  const isSelectedCoachSessionDone = selectedCoachSession?.status?.toLowerCase() === "completed";
+  const isSelectedCoachSessionPlanned = selectedCoachSession?.status?.toLowerCase() === "planned";
+  const isSelectedCoachSessionToPlan = isSelectedCoachSessionPlanned && selectedCoachSessionScheduledAt === null;
+  const isSelectedCoachSessionProgrammed = isSelectedCoachSessionPlanned && selectedCoachSessionScheduledAt !== null;
+
+  const coachingHeaderStatus = selectedCoachSession
+    ? isSelectedCoachSessionDone
+      ? { label: "Faite", className: "tf-chip tf-chip--done" }
+      : isSelectedCoachSessionProgrammed
+        ? { label: "Programmée", className: "tf-chip tf-chip--planned" }
+        : { label: "À programmer", className: "tf-chip" }
+    : null;
+
   function openModule(module: ModuleItem, tab: "lessons" | "quiz" = "lessons", lessonId: string | null = null) {
     if (unlockedByModuleId[module.id] !== true) {
       return;
@@ -1327,6 +1471,17 @@ export default function StatsPage() {
   }, [currentModuleId, expandedModuleId, moduleFilter]);
 
   useEffect(() => {
+    if (!selectedSessionId) {
+      return;
+    }
+
+    const stillVisible = coachSessionsSorted.some((session) => session.id === selectedSessionId);
+    if (!stillVisible) {
+      setSelectedSessionId(null);
+    }
+  }, [coachSessionsSorted, selectedSessionId]);
+
+  useEffect(() => {
     if (!isCalendarOpen || !userId) {
       return;
     }
@@ -1406,6 +1561,58 @@ export default function StatsPage() {
       isMounted = false;
     };
   }, [calendarMonthDate, isCalendarOpen, userId]);
+
+  useEffect(() => {
+    if (viewMode !== "coaching" || !userId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    (async () => {
+      const primarySelect =
+        "id,user_id,status,order_index,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
+      const fallbackSelect = "id,user_id,status,created_at,theme,objective,booking_url,scheduled_at,summary,recording_url,transcript";
+
+      let disableOrderIndex = false;
+      let { data: sessionsData, error: sessionsError } = await supabase
+        .from("sessions")
+        .select(primarySelect)
+        .eq("user_id", userId)
+        .order("scheduled_at", { ascending: true });
+
+      if (sessionsError && isOrderIndexMissingColumnError(sessionsError.message)) {
+        disableOrderIndex = true;
+        const fallbackResult = await supabase
+          .from("sessions")
+          .select(fallbackSelect)
+          .eq("user_id", userId)
+          .order("scheduled_at", { ascending: true });
+        sessionsData = fallbackResult.data as SessionItem[] | null;
+        sessionsError = fallbackResult.error;
+      }
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (sessionsError) {
+        if (!isMissingSessionsTable(sessionsError)) {
+          setSessionsLoadError(`Impossible de charger les séances : ${sessionsError.message}`);
+        }
+        return;
+      }
+
+      const normalizedSessions = disableOrderIndex
+        ? ((sessionsData ?? []) as Array<Omit<SessionItem, "order_index">>).map((session) => ({ ...session, order_index: null }))
+        : ((sessionsData ?? []) as SessionItem[]);
+      setSessions(normalizedSessions);
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, viewMode]);
 
   function renderActivePanelBody() {
     if (!activeModule) {
@@ -1528,6 +1735,90 @@ export default function StatsPage() {
           </div>
         )}
       </>
+    );
+  }
+
+  function renderCoachingPanelBody() {
+    if (!selectedCoachSession) {
+      return <div className="empty-state">Choisis une séance à gauche pour afficher son détail.</div>;
+    }
+
+    if (isSelectedCoachSessionToPlan) {
+      return (
+        <div className="tf-paneStack">
+          <div className="tf-coachHeroIcon" aria-hidden="true">📅</div>
+          <h3 className="tf-title" style={{ margin: 0 }}>Séance à programmer</h3>
+          <p className="tf-subtitle" style={{ margin: 0 }}>
+            Cette séance n&apos;a pas encore de créneau. Réserve maintenant pour la planifier.
+          </p>
+          <div>
+            <button
+              type="button"
+              className="tf-btn tf-btn--accent"
+              onClick={() => openCalendlyWindow(selectedCoachSession.booking_url)}
+              disabled={!isValidHttpUrl(selectedCoachSession.booking_url)}
+            >
+              Réserver cette séance
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (isSelectedCoachSessionProgrammed) {
+      const plannedDateLabel = formatDate(selectedCoachSession.scheduled_at) ?? "date non disponible";
+      return (
+        <div className="tf-paneStack">
+          <h3 className="tf-title" style={{ margin: 0 }}>Séance programmée</h3>
+          <p className="tf-subtitle" style={{ margin: 0 }}>Déjà planifiée pour le {plannedDateLabel}.</p>
+          <div>
+            <button
+              type="button"
+              className="tf-btn tf-btn--planned"
+              onClick={() => openCalendlyWindow(selectedCoachSession.booking_url)}
+              disabled={!isValidHttpUrl(selectedCoachSession.booking_url)}
+            >
+              Reprogrammer la séance
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const recordingUrl = selectedCoachSession.recording_url?.trim() ?? "";
+    const canShowRecording = isValidHttpUrl(recordingUrl);
+    const transcriptText = selectedCoachSession.transcript?.trim();
+    const summaryText = selectedCoachSession.summary?.trim();
+
+    return (
+      <div className="tf-paneStack">
+        {canShowRecording ? (
+          <div className="modal-video">
+            <iframe
+              src={recordingUrl}
+              title={`Enregistrement ${selectedCoachSession.theme ?? "séance libre"}`}
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        ) : (
+          <div className="empty-state">Enregistrement non disponible pour le moment.</div>
+        )}
+
+        <section className="card tf-card">
+          <h4 className="card-title tf-title">Transcription</h4>
+          <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
+            {transcriptText || "En cours de traitement"}
+          </p>
+        </section>
+
+        <section className="card tf-card">
+          <h4 className="card-title tf-title">Résumé</h4>
+          <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
+            {summaryText || "Résumé indisponible pour le moment."}
+          </p>
+        </section>
+      </div>
     );
   }
 
@@ -1888,13 +2179,49 @@ export default function StatsPage() {
 
           <main className="tf-dashboardMain">
             <div className="tf-topRow">
-              <div className="tf-card tf-card--flat tf-academyCard">
-                <span className="tf-quickIcon" aria-hidden="true">◈</span>
-                <div className="tf-quickText">
-                  <div className="tf-quickTitle">Académie</div>
-                  <div className="tf-quickMeta">Accompagnement</div>
-                </div>
-                <span className="tf-academyCaret" aria-hidden="true">⌄</span>
+              <div className="tf-viewModeMenuWrap">
+                <button
+                  type="button"
+                  className="card-button tf-card tf-card--flat tf-academyCard"
+                  onClick={() => setShowViewModeMenu((current) => !current)}
+                  aria-haspopup="menu"
+                  aria-expanded={showViewModeMenu}
+                >
+                  <div className="tf-topSelectRow">
+                    <span className="tf-quickIcon" aria-hidden="true">◈</span>
+                    <span className="tf-topSelectText">{viewMode === "coaching" ? "Coaching" : "Accompagnement"}</span>
+                    <span className="tf-academyCaret" aria-hidden="true">⌄</span>
+                  </div>
+                </button>
+
+                {showViewModeMenu && (
+                  <div className="tf-viewModeMenu" role="menu" aria-label="Choix du mode">
+                    <button
+                      type="button"
+                      className={`tf-viewModeMenuItem${viewMode === "accompagnement" ? " isActive" : ""}`}
+                      role="menuitem"
+                      onClick={() => {
+                        setViewMode("accompagnement");
+                        setShowExpandedContent(false);
+                        setShowViewModeMenu(false);
+                      }}
+                    >
+                      Accompagnement
+                    </button>
+                    <button
+                      type="button"
+                      className={`tf-viewModeMenuItem${viewMode === "coaching" ? " isActive" : ""}`}
+                      role="menuitem"
+                      onClick={() => {
+                        setViewMode("coaching");
+                        setShowExpandedContent(false);
+                        setShowViewModeMenu(false);
+                      }}
+                    >
+                      Coaching
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="tf-quickActions">
@@ -1957,182 +2284,283 @@ export default function StatsPage() {
 
             <div className="tf-contentRow">
               <section className="tf-leftPane" style={{ padding: 14 }}>
-                <div className="tf-cardHeader" style={{ alignItems: "center" }}>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                    <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
-                      <button
-                        type="button"
-                        className={`tf-tab${moduleFilter === "all" ? " isActive" : ""}`}
-                        onClick={() => setModuleFilter("all")}
-                      >
-                        Tous
-                      </button>
-                      <button
-                        type="button"
-                        className={`tf-tab${moduleFilter === "todo" ? " isActive" : ""}`}
-                        onClick={() => setModuleFilter("todo")}
-                      >
-                        À faire
-                      </button>
-                      <button
-                        type="button"
-                        className={`tf-tab${moduleFilter === "done" ? " isActive" : ""}`}
-                        onClick={() => setModuleFilter("done")}
-                      >
-                        Fait
-                      </button>
-                    </div>
-                  </div>
-                  {badgeLoadError && (
-                    <span className="card-meta" style={{ color: "#991b1b" }}>
-                      {badgeLoadError}
-                    </span>
-                  )}
-                </div>
-
-                {formationError && <div className="error-box">{formationError}</div>}
-
-                <div className="tf-scroll">
-                  <div className="tf-paneStack">
-                    {!formationError && modulesMeta.length === 0 && <div className="empty-state">Aucun module disponible.</div>}
-
-                    {!formationError && modulesMeta.length > 0 && filteredModules.length === 0 && (
-                      <div className="empty-state">
-                        {moduleFilter === "done"
-                          ? "Aucun module terminé."
-                          : moduleFilter === "todo"
-                            ? "Aucun module à faire."
-                            : "Aucun module disponible."}
+                {viewMode === "accompagnement" ? (
+                  <>
+                    <div className="tf-cardHeader" style={{ alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <div className="tf-tabs" style={{ flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            className={`tf-tab${moduleFilter === "all" ? " isActive" : ""}`}
+                            onClick={() => setModuleFilter("all")}
+                          >
+                            Tous
+                          </button>
+                          <button
+                            type="button"
+                            className={`tf-tab${moduleFilter === "todo" ? " isActive" : ""}`}
+                            onClick={() => setModuleFilter("todo")}
+                          >
+                            À faire
+                          </button>
+                          <button
+                            type="button"
+                            className={`tf-tab${moduleFilter === "done" ? " isActive" : ""}`}
+                            onClick={() => setModuleFilter("done")}
+                          >
+                            Fait
+                          </button>
+                        </div>
                       </div>
-                    )}
+                      {badgeLoadError && (
+                        <span className="card-meta" style={{ color: "#991b1b" }}>
+                          {badgeLoadError}
+                        </span>
+                      )}
+                    </div>
 
-                    {!formationError &&
-                      filteredModules.length > 0 &&
-                      filteredModules.map((moduleMeta) => {
-                        const {
-                          module,
-                          lessonsForModule,
-                          progressPct,
-                          isUnlocked,
-                          moduleHasQuiz,
-                          moduleBadgeLabel,
-                          moduleBadgeClass,
-                          ringColor,
-                        } = moduleMeta;
-                        const isSelected = expandedModuleId === module.id;
-                        const quizState =
-                          passedByModuleId[module.id] === true
-                            ? "passed"
-                            : activeModule?.id === module.id &&
-                                activeTab === "quiz" &&
-                                quizSubmitMessage === "Certaines réponses sont incorrectes. Réessaie."
-                              ? "failed"
-                              : "todo";
+                    {formationError && <div className="error-box">{formationError}</div>}
 
-                        return (
-                          <div key={module.id} ref={(element) => { moduleRefs.current[module.id] = element; }} className="tf-moduleCard">
+                    <div className="tf-scroll">
+                      <div className="tf-paneStack">
+                        {!formationError && modulesMeta.length === 0 && <div className="empty-state">Aucun module disponible.</div>}
+
+                        {!formationError && modulesMeta.length > 0 && filteredModules.length === 0 && (
+                          <div className="empty-state">
+                            {moduleFilter === "done"
+                              ? "Aucun module terminé."
+                              : moduleFilter === "todo"
+                                ? "Aucun module à faire."
+                                : "Aucun module disponible."}
+                          </div>
+                        )}
+
+                        {!formationError &&
+                          filteredModules.length > 0 &&
+                          filteredModules.map((moduleMeta) => {
+                            const {
+                              module,
+                              lessonsForModule,
+                              progressPct,
+                              isUnlocked,
+                              moduleHasQuiz,
+                              moduleBadgeLabel,
+                              moduleBadgeClass,
+                              ringColor,
+                            } = moduleMeta;
+                            const isSelected = expandedModuleId === module.id;
+                            const quizState =
+                              passedByModuleId[module.id] === true
+                                ? "passed"
+                                : activeModule?.id === module.id &&
+                                    activeTab === "quiz" &&
+                                    quizSubmitMessage === "Certaines réponses sont incorrectes. Réessaie."
+                                  ? "failed"
+                                  : "todo";
+
+                            return (
+                              <div key={module.id} ref={(element) => { moduleRefs.current[module.id] = element; }} className="tf-moduleCard">
+                                <button
+                                  type="button"
+                                  className={`card-button tf-card tf-moduleCardFixed${module.id === activeLessonModuleId ? " tf-moduleCard--active" : ""}`}
+                                  onClick={() => toggleModule(module)}
+                                  aria-label={`Ouvrir le module ${module.title}`}
+                                  aria-expanded={isSelected}
+                                  disabled={!isUnlocked}
+                                  style={!isUnlocked ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
+                                >
+                                  <div className="tf-moduleTop">
+                                    <div className="tf-moduleTitleBlock">
+                                      <h4 className="tf-moduleTitle tf-clamp2">{module.title}</h4>
+                                      <span className={`${moduleBadgeClass} tf-moduleBadge--small`}>{moduleBadgeLabel}</span>
+                                    </div>
+                                    <div
+                                      className="tf-moduleRing"
+                                      aria-label={`Progression ${progressPct}%`}
+                                      style={{ background: `conic-gradient(${ringColor} ${progressPct}%, rgba(255,255,255,.10) 0)` }}
+                                    >
+                                      <span>{progressPct}%</span>
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {isSelected && (
+                                  <div className="tf-moduleExpand" onClick={(event) => event.stopPropagation()}>
+                                    <div className="tf-lessonTree">
+                                      {lessonsForModule.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
+
+                                      {lessonsForModule.map((lesson) => {
+                                        const isLessonSelected = activeLesson?.id === lesson.id;
+                                        const isCompleted = completedByLessonId[lesson.id] === true;
+
+                                        return (
+                                          <div
+                                            key={lesson.id}
+                                            className={`tf-lessonRow${isCompleted ? " tf-lessonRow--done" : ""}`}
+                                            style={isLessonSelected ? { borderColor: "#AF8732" } : undefined}
+                                          >
+                                            <button
+                                              type="button"
+                                              className="tf-lessonLeft"
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                openModule(module, "lessons", lesson.id);
+                                              }}
+                                              aria-label={`Ouvrir la leçon ${lesson.title}`}
+                                            >
+                                              <span className="tf-lessonIcon" aria-hidden="true">
+                                                {lesson.content_type?.toLowerCase() === "video" ? "▶" : "≡"}
+                                              </span>
+                                              <span style={{ minWidth: 0 }}>
+                                                <span className="tf-lessonTitle">{lesson.title}</span>
+                                                <span className="tf-lessonMeta">
+                                                  {getLessonTypeLabel(lesson.content_type)}
+                                                  {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
+                                                </span>
+                                              </span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="tf-lessonToggle"
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                openModule(module, "lessons", lesson.id);
+                                              }}
+                                              aria-label={isCompleted ? `Leçon ${lesson.title} terminée` : `Ouvrir la leçon ${lesson.title}`}
+                                            >
+                                              {isCompleted ? "✓" : ""}
+                                            </button>
+                                          </div>
+                                        );
+                                      })}
+
+                                      {moduleHasQuiz && (
+                                        <button
+                                          type="button"
+                                          className={`tf-quizRow${quizState === "passed" ? " tf-quizRow--passed" : ""}${quizState === "failed" ? " tf-quizRow--failed" : ""}`}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            openModule(module, "quiz", null);
+                                          }}
+                                        >
+                                          {quizState === "passed" ? "Quiz validé" : quizState === "failed" ? "Quiz échoué" : "Quiz à faire"}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="tf-cardHeader" style={{ alignItems: "center" }}>
+                      <div style={{ display: "grid", gap: 10, width: "100%" }}>
+                        <div className="tf-tabs tf-coachTabs" style={{ flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            className={`tf-tab${coachTimeFilter === "all" ? " isActive" : ""}`}
+                            onClick={() => setCoachTimeFilter("all")}
+                          >
+                            Toute
+                          </button>
+                          <button
+                            type="button"
+                            className={`tf-tab${coachTimeFilter === "upcoming" ? " isActive" : ""}`}
+                            onClick={() => setCoachTimeFilter("upcoming")}
+                          >
+                            À venir
+                          </button>
+                          <button
+                            type="button"
+                            className={`tf-tab${coachTimeFilter === "past" ? " isActive" : ""}`}
+                            onClick={() => setCoachTimeFilter("past")}
+                          >
+                            Passée
+                          </button>
+                        </div>
+                        <div className="tf-tabs tf-coachTopicToggle" style={{ flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            className={`tf-tab${coachTopicFilter === "with" ? " isActive" : ""}`}
+                            onClick={() => setCoachTopicFilter("with")}
+                          >
+                            Avec sujet
+                          </button>
+                          <button
+                            type="button"
+                            className={`tf-tab${coachTopicFilter === "without" ? " isActive" : ""}`}
+                            onClick={() => setCoachTopicFilter("without")}
+                          >
+                            Sans sujet
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {sessionsLoadError && <div className="error-box">{sessionsLoadError}</div>}
+
+                    <div className="tf-scroll">
+                      <div className="tf-paneStack">
+                        {coachSessionsSorted.length === 0 && (
+                          <div className="empty-state">
+                            {coachTimeFilter === "upcoming"
+                              ? "Aucune séance à venir pour ce filtre."
+                              : coachTimeFilter === "past"
+                                ? "Aucune séance passée pour ce filtre."
+                                : "Aucune séance disponible pour ce filtre."}
+                          </div>
+                        )}
+
+                        {coachSessionsSorted.map((session) => {
+                          const isSelectedSession = selectedSessionId === session.id;
+                          const scheduledAtTs = parseDate(session.scheduled_at);
+                          const isDone = session.status?.toLowerCase() === "completed";
+                          const isProgrammed = session.status?.toLowerCase() === "planned" && scheduledAtTs !== null;
+                          const sessionBadgeLabel = isDone ? "Faite" : isProgrammed ? "Programmée" : "À programmer";
+                          const sessionBadgeClass = isDone
+                            ? "tf-sessionBadge tf-sessionBadge--done"
+                            : isProgrammed
+                              ? "tf-sessionBadge tf-sessionBadge--planned"
+                              : "tf-sessionBadge tf-sessionBadge--todo";
+
+                          return (
                             <button
+                              key={session.id}
                               type="button"
-                              className={`card-button tf-card tf-moduleCardFixed${module.id === activeLessonModuleId ? " tf-moduleCard--active" : ""}`}
-                              onClick={() => toggleModule(module)}
-                              aria-label={`Ouvrir le module ${module.title}`}
-                              aria-expanded={isSelected}
-                              disabled={!isUnlocked}
-                              style={!isUnlocked ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
+                              className={`card-button tf-card tf-moduleCardFixed tf-sessionCard${isSelectedSession ? " tf-moduleCard--active tf-sessionCard--active" : ""}`}
+                              onClick={() => setSelectedSessionId(session.id)}
+                              aria-label={`Sélectionner la séance ${session.theme ?? "sans sujet"}`}
                             >
                               <div className="tf-moduleTop">
                                 <div className="tf-moduleTitleBlock">
-                                  <h4 className="tf-moduleTitle tf-clamp2">{module.title}</h4>
-                                  <span className={`${moduleBadgeClass} tf-moduleBadge--small`}>{moduleBadgeLabel}</span>
+                                  <h4 className="tf-moduleTitle tf-clamp2">{session.theme ?? "Séance libre (sujet au choix)"}</h4>
+                                  <span className={`tf-moduleBadge tf-moduleBadge--small ${sessionBadgeClass}`}>{sessionBadgeLabel}</span>
                                 </div>
-                                <div
-                                  className="tf-moduleRing"
-                                  aria-label={`Progression ${progressPct}%`}
-                                  style={{ background: `conic-gradient(${ringColor} ${progressPct}%, rgba(255,255,255,.10) 0)` }}
-                                >
-                                  <span>{progressPct}%</span>
+                                <div className="tf-sessionDateMeta">
+                                  {scheduledAtTs !== null
+                                    ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(scheduledAtTs))
+                                    : "À programmer"}
                                 </div>
                               </div>
                             </button>
-
-                            {isSelected && (
-                              <div className="tf-moduleExpand" onClick={(event) => event.stopPropagation()}>
-                                <div className="tf-lessonTree">
-                                  {lessonsForModule.length === 0 && <div className="empty-state">Aucune leçon publiée dans ce module.</div>}
-
-                                  {lessonsForModule.map((lesson) => {
-                                    const isLessonSelected = activeLesson?.id === lesson.id;
-                                    const isCompleted = completedByLessonId[lesson.id] === true;
-
-                                    return (
-                                      <div
-                                        key={lesson.id}
-                                        className={`tf-lessonRow${isCompleted ? " tf-lessonRow--done" : ""}`}
-                                        style={isLessonSelected ? { borderColor: "#AF8732" } : undefined}
-                                      >
-                                        <button
-                                          type="button"
-                                          className="tf-lessonLeft"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            openModule(module, "lessons", lesson.id);
-                                          }}
-                                          aria-label={`Ouvrir la leçon ${lesson.title}`}
-                                        >
-                                          <span className="tf-lessonIcon" aria-hidden="true">
-                                            {lesson.content_type?.toLowerCase() === "video" ? "▶" : "≡"}
-                                          </span>
-                                          <span style={{ minWidth: 0 }}>
-                                            <span className="tf-lessonTitle">{lesson.title}</span>
-                                            <span className="tf-lessonMeta">
-                                              {getLessonTypeLabel(lesson.content_type)}
-                                              {lesson.duration_min ? ` · ${lesson.duration_min} min` : ""}
-                                            </span>
-                                          </span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="tf-lessonToggle"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            openModule(module, "lessons", lesson.id);
-                                          }}
-                                          aria-label={isCompleted ? `Leçon ${lesson.title} terminée` : `Ouvrir la leçon ${lesson.title}`}
-                                        >
-                                          {isCompleted ? "✓" : ""}
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
-
-                                  {moduleHasQuiz && (
-                                    <button
-                                      type="button"
-                                      className={`tf-quizRow${quizState === "passed" ? " tf-quizRow--passed" : ""}${quizState === "failed" ? " tf-quizRow--failed" : ""}`}
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        openModule(module, "quiz", null);
-                                      }}
-                                    >
-                                      {quizState === "passed" ? "Quiz validé" : quizState === "failed" ? "Quiz échoué" : "Quiz à faire"}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </section>
 
               <section className="tf-centerPane tf-card" style={{ padding: 14 }}>
-                {quizDataError && <div className="error-box">{quizDataError}</div>}
+                {viewMode === "accompagnement" && quizDataError && <div className="error-box">{quizDataError}</div>}
 
                 <div className="tf-scroll">
                   <div className="tf-paneStack">
-                    {activeModule && (
+                    {viewMode === "accompagnement" && activeModule && (
                       <>
                         <div className="tf-contentHeader">
                           <div className="tf-titleRow">
@@ -2172,7 +2600,28 @@ export default function StatsPage() {
                       </>
                     )}
 
-                    {renderActivePanelBody()}
+                    {viewMode === "coaching" && selectedCoachSession && (
+                      <div className="tf-contentHeader">
+                        <div className="tf-titleRow">
+                          <h2 className="tf-contentTitle tf-title">{selectedCoachSession.theme ?? "Séance libre (sujet au choix)"}</h2>
+                          <div className="tf-titleActions">
+                            {coachingHeaderStatus && <span className={coachingHeaderStatus.className}>{coachingHeaderStatus.label}</span>}
+                            <button
+                              type="button"
+                              className="tf-actionPill"
+                              onClick={() => setShowExpandedContent(true)}
+                              aria-label="Ouvrir le contenu en grand"
+                              title="Ouvrir en grand"
+                            >
+                              ⤢
+                            </button>
+                          </div>
+                        </div>
+                        {selectedCoachSession.objective && <p className="tf-contentSubtitle">{selectedCoachSession.objective}</p>}
+                      </div>
+                    )}
+
+                    {viewMode === "accompagnement" ? renderActivePanelBody() : renderCoachingPanelBody()}
                   </div>
                 </div>
               </section>
@@ -2181,7 +2630,7 @@ export default function StatsPage() {
         </section>
       )}
 
-      {showExpandedContent && activeModule && (
+      {showExpandedContent && ((viewMode === "accompagnement" && activeModule) || (viewMode === "coaching" && selectedCoachSession)) && (
         <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowExpandedContent(false)}>
           <div
             className="modal-panel tf-modalPanel tf-card"
@@ -2189,13 +2638,22 @@ export default function StatsPage() {
             style={{ width: "min(1180px, 100%)", maxHeight: "90vh" }}
           >
             <div className="modal-header">
-              <div>
-                <p className="card-meta tf-chip tf-chip--accent">Module</p>
-                <h3 className="modal-title tf-title">{activeModule.title}</h3>
-                {activeModule.description && <p className="tf-contentSubtitle">{activeModule.description}</p>}
-              </div>
+              {viewMode === "accompagnement" && activeModule ? (
+                <div>
+                  <p className="card-meta tf-chip tf-chip--accent">Module</p>
+                  <h3 className="modal-title tf-title">{activeModule.title}</h3>
+                  {activeModule.description && <p className="tf-contentSubtitle">{activeModule.description}</p>}
+                </div>
+              ) : (
+                <div>
+                  <p className="card-meta tf-chip tf-chip--accent">Coaching</p>
+                  <h3 className="modal-title tf-title">{selectedCoachSession?.theme ?? "Séance libre (sujet au choix)"}</h3>
+                  {selectedCoachSession?.objective && <p className="tf-contentSubtitle">{selectedCoachSession.objective}</p>}
+                </div>
+              )}
               <div className="tf-paneActions" style={{ alignItems: "center", flexWrap: "wrap" }}>
-                {activeStatus && <span className={activeStatus.className}>{activeStatus.label}</span>}
+                {viewMode === "accompagnement" && activeStatus && <span className={activeStatus.className}>{activeStatus.label}</span>}
+                {viewMode === "coaching" && coachingHeaderStatus && <span className={coachingHeaderStatus.className}>{coachingHeaderStatus.label}</span>}
                 <button type="button" className="btn" onClick={() => setShowExpandedContent(false)}>
                   Fermer
                 </button>
@@ -2203,7 +2661,7 @@ export default function StatsPage() {
             </div>
 
             <div className="tf-scroll" style={{ maxHeight: "calc(90vh - 180px)" }}>
-              <div className="tf-paneStack">{renderActivePanelBody()}</div>
+              <div className="tf-paneStack">{viewMode === "accompagnement" ? renderActivePanelBody() : renderCoachingPanelBody()}</div>
             </div>
           </div>
         </div>
