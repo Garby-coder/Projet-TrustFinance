@@ -137,6 +137,21 @@ function extractUserId(payload) {
   return null;
 }
 
+function getStartAt(payload) {
+  const value =
+    payload?.scheduled_event?.start_time ||
+    payload?.event?.start_time ||
+    payload?.scheduled_event?.start_time ||
+    null;
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized || null;
+}
+
 function resolveSessionTemplate(eventName) {
   const normalizedName = String(eventName ?? "").trim();
 
@@ -282,8 +297,26 @@ async function insertSession(supabaseUrl, serviceRoleKey, payload) {
   });
 }
 
+async function patchCanceledSessionByUserAndStartAt({ supabaseUrl, serviceRoleKey, userId, startAt }) {
+  await supabaseRequest({
+    supabaseUrl,
+    serviceRoleKey,
+    table: "sessions",
+    method: "PATCH",
+    query: {
+      user_id: `eq.${userId}`,
+      status: "eq.planned",
+      scheduled_at: `eq.${startAt}`,
+    },
+    body: {
+      scheduled_at: null,
+    },
+    prefer: "return=minimal",
+  });
+}
+
 async function handleInviteeCreated({ supabaseUrl, serviceRoleKey, userId, payload }) {
-  const startAt = typeof payload?.scheduled_event?.start_time === "string" ? payload.scheduled_event.start_time.trim() : "";
+  const startAt = getStartAt(payload);
   if (!startAt) {
     console.warn("Webhook Calendly ignoré: start_time absent sur invitee.created.");
     return;
@@ -332,36 +365,6 @@ async function handleInviteeCreated({ supabaseUrl, serviceRoleKey, userId, paylo
   });
 }
 
-async function handleInviteeCanceled({ supabaseUrl, serviceRoleKey, userId, payload }) {
-  const startAt = typeof payload?.scheduled_event?.start_time === "string" ? payload.scheduled_event.start_time.trim() : "";
-  if (!startAt) {
-    console.warn("Webhook Calendly ignoré: start_time absent sur invitee.canceled.");
-    return;
-  }
-
-  const scheduledSession = await supabaseRequest({
-    supabaseUrl,
-    serviceRoleKey,
-    table: "sessions",
-    query: {
-      select: "id",
-      user_id: `eq.${userId}`,
-      status: "eq.planned",
-      scheduled_at: `eq.${startAt}`,
-      limit: "1",
-    },
-  });
-
-  const session = Array.isArray(scheduledSession) ? scheduledSession[0] ?? null : null;
-  if (!session?.id) {
-    return;
-  }
-
-  await updateSessionById(supabaseUrl, serviceRoleKey, session.id, {
-    scheduled_at: null,
-  });
-}
-
 exports.handler = async function handler(event) {
   if (event?.httpMethod !== "POST") {
     return jsonResponse(405, { ok: false, error: "method_not_allowed" });
@@ -401,50 +404,64 @@ exports.handler = async function handler(event) {
     return jsonResponse(401, { ok: false, error: "invalid_signature" });
   }
 
-  let payload;
+  let body;
   try {
-    payload = JSON.parse(rawBody);
+    body = JSON.parse(rawBody);
   } catch {
     return jsonResponse(400, { ok: false, error: "invalid_json" });
   }
 
-  const webhookEvent = payload?.event;
-  const webhookPayload = payload?.payload;
+  const webhookEvent = body?.event;
+  const webhookPayload = body?.payload;
 
   if (!webhookEvent || !webhookPayload) {
     return jsonResponse(200, { ok: true, ignored: true });
   }
 
-  if (webhookEvent !== "invitee.created" && webhookEvent !== "invitee.canceled") {
-    return jsonResponse(200, { ok: true, ignored: true });
+  if (webhookEvent === "invitee.canceled") {
+    const userId = extractUserId(webhookPayload);
+    const startAt = getStartAt(webhookPayload);
+
+    if (!userId || !startAt) {
+      return jsonResponse(200, { ok: true, ignored: true });
+    }
+
+    try {
+      await patchCanceledSessionByUserAndStartAt({
+        supabaseUrl,
+        serviceRoleKey,
+        userId,
+        startAt,
+      });
+    } catch (error) {
+      console.error("Erreur webhook Calendly invitee.canceled.", error);
+      return jsonResponse(200, { ok: true, ignored: true });
+    }
+
+    return jsonResponse(200, { ok: true, handled: "invitee.canceled" });
   }
 
-  const userId = extractUserId(webhookPayload);
-  if (!userId) {
-    console.warn("Webhook Calendly ignoré: TF_USER_ID absent ou invalide.");
-    return jsonResponse(200, { ok: true, ignored: true });
-  }
+  if (webhookEvent === "invitee.created") {
+    const userId = extractUserId(webhookPayload);
+    if (!userId) {
+      console.warn("Webhook Calendly ignoré: TF_USER_ID absent ou invalide.");
+      return jsonResponse(200, { ok: true, ignored: true });
+    }
 
-  try {
-    if (webhookEvent === "invitee.created") {
+    try {
       await handleInviteeCreated({
         supabaseUrl,
         serviceRoleKey,
         userId,
         payload: webhookPayload,
       });
-    } else {
-      await handleInviteeCanceled({
-        supabaseUrl,
-        serviceRoleKey,
-        userId,
-        payload: webhookPayload,
-      });
+    } catch (error) {
+      console.error("Erreur webhook Calendly invitee.created.", error);
+      return jsonResponse(500, { ok: false, error: "internal_error" });
     }
-  } catch (error) {
-    console.error("Erreur webhook Calendly.", error);
-    return jsonResponse(500, { ok: false, error: "internal_error" });
+
+    return jsonResponse(200, { ok: true, handled: "invitee.created" });
   }
 
-  return jsonResponse(200, { ok: true });
+  return jsonResponse(200, { ok: true, ignored: true });
 };
