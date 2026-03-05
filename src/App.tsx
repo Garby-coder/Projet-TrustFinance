@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
 import "./styles/make-dashboard.css";
 
@@ -30,6 +30,8 @@ const CADENCE_OPTIONS: CadenceOption[] = [
   { id: "three-per-week", label: "3 fois par semaine", cadence_unit: "week", cadence_target: 3 },
   { id: "once-per-week", label: "1 fois par semaine", cadence_unit: "week", cadence_target: 1 },
 ];
+const LAST_PATH_STORAGE_KEY = "tf:lastPath";
+const RESTORABLE_LAST_PATHS = new Set(["/stats", "/formation", "/seances"]);
 
 function getCadenceSelection(engagement: UserEngagement | null): CadenceOption["id"] {
   if (!engagement) {
@@ -63,6 +65,70 @@ function getLocalDateKey() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function RoutePersistence({ isAuthed }: { isAuthed: boolean }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const didRestorePath = useRef(false);
+
+  useEffect(() => {
+    if (location.pathname === "/login") {
+      return;
+    }
+
+    const fullPath = `${location.pathname}${location.search || ""}`;
+    try {
+      window.localStorage.setItem(LAST_PATH_STORAGE_KEY, fullPath);
+    } catch {
+      // Ignore localStorage errors.
+    }
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!isAuthed) {
+      didRestorePath.current = false;
+      return;
+    }
+
+    if (didRestorePath.current) {
+      return;
+    }
+
+    if (location.pathname !== "/login" && location.pathname !== "/") {
+      didRestorePath.current = true;
+      return;
+    }
+
+    let lastPath = "";
+    try {
+      lastPath = (window.localStorage.getItem(LAST_PATH_STORAGE_KEY) ?? "").trim();
+    } catch {
+      lastPath = "";
+    }
+
+    if (!lastPath) {
+      didRestorePath.current = true;
+      return;
+    }
+
+    const lastPathname = lastPath.split("?")[0] ?? "";
+    if (!RESTORABLE_LAST_PATHS.has(lastPathname)) {
+      didRestorePath.current = true;
+      return;
+    }
+
+    const currentFullPath = `${location.pathname}${location.search || ""}`;
+    if (lastPath !== currentFullPath) {
+      didRestorePath.current = true;
+      navigate(lastPath, { replace: true });
+      return;
+    }
+
+    didRestorePath.current = true;
+  }, [isAuthed, location.pathname, location.search, navigate]);
+
+  return null;
 }
 
 export default function App() {
@@ -338,6 +404,8 @@ export default function App() {
   return (
     <div className="tf-app">
       <BrowserRouter>
+        <RoutePersistence isAuthed={isAuthed} />
+
         <Routes>
           <Route path="/login" element={isAuthed ? <Navigate to="/" replace /> : <Login />} />
 

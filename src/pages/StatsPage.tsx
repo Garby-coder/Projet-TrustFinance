@@ -93,10 +93,22 @@ type QuizQuestion = QuizQuestionRow & {
 };
 
 type ModuleFilter = "all" | "todo" | "done";
+type PersistedStatsState = {
+  viewMode?: "accompagnement" | "coaching";
+  coachTimeFilter?: "all" | "upcoming" | "past";
+  coachTopicFilter?: "with" | "without";
+  selectedSessionId?: string | null;
+  activeLessonId?: string | null;
+  activeModuleId?: string | null;
+  expandedModuleId?: string | null;
+  activeTab?: "lessons" | "quiz";
+  moduleFilter?: ModuleFilter;
+};
 
 const CALENDLY_FREE_FALLBACK_URL =
   (import.meta.env.VITE_CALENDLY_FREE_URL ?? "").trim() ||
   "https://calendly.com/trustfinanceam/reserve-ton-appel-avec-matheo-aalberg-clone";
+const STORAGE_KEY = "tf:statsState";
 
 const COACH_THEME_ORDER = [
   "Présentation de l’accompagnement & Bilan initial.",
@@ -471,6 +483,8 @@ export default function StatsPage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(false);
   const [profileEngagement, setProfileEngagement] = useState<ProfileEngagement>(EMPTY_PROFILE_ENGAGEMENT);
+  const [restoredActiveModuleId, setRestoredActiveModuleId] = useState<string | null>(null);
+  const [hasLoadedStoredState, setHasLoadedStoredState] = useState(false);
   const moduleRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const didAutoOpen = useRef(false);
 
@@ -561,6 +575,94 @@ export default function StatsPage() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [showViewModeMenu]);
+
+  useEffect(() => {
+    let parsed: PersistedStatsState | null = null;
+
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        parsed = JSON.parse(raw) as PersistedStatsState;
+      }
+    } catch {
+      parsed = null;
+    }
+
+    if (parsed) {
+      if (parsed.viewMode === "accompagnement" || parsed.viewMode === "coaching") {
+        setViewMode(parsed.viewMode);
+      }
+
+      if (parsed.coachTimeFilter === "all" || parsed.coachTimeFilter === "upcoming" || parsed.coachTimeFilter === "past") {
+        setCoachTimeFilter(parsed.coachTimeFilter);
+      }
+
+      if (parsed.coachTopicFilter === "with" || parsed.coachTopicFilter === "without") {
+        setCoachTopicFilter(parsed.coachTopicFilter);
+      }
+
+      if (parsed.selectedSessionId === null || typeof parsed.selectedSessionId === "string") {
+        setSelectedSessionId(parsed.selectedSessionId ?? null);
+      }
+
+      if (parsed.activeLessonId === null || typeof parsed.activeLessonId === "string") {
+        setActiveLessonId(parsed.activeLessonId ?? null);
+      }
+
+      if (parsed.expandedModuleId === null || typeof parsed.expandedModuleId === "string") {
+        setExpandedModuleId(parsed.expandedModuleId ?? null);
+      }
+
+      if (parsed.activeTab === "lessons" || parsed.activeTab === "quiz") {
+        setActiveTab(parsed.activeTab);
+      }
+
+      if (parsed.moduleFilter === "all" || parsed.moduleFilter === "todo" || parsed.moduleFilter === "done") {
+        setModuleFilter(parsed.moduleFilter);
+      }
+
+      if (parsed.activeModuleId === null || typeof parsed.activeModuleId === "string") {
+        setRestoredActiveModuleId(parsed.activeModuleId ?? null);
+      }
+    }
+
+    setHasLoadedStoredState(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedStoredState) {
+      return;
+    }
+
+    const nextState: PersistedStatsState = {
+      viewMode,
+      coachTimeFilter,
+      coachTopicFilter,
+      selectedSessionId,
+      activeLessonId,
+      activeModuleId: activeModule?.id ?? null,
+      expandedModuleId,
+      activeTab,
+      moduleFilter,
+    };
+
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+    } catch {
+      // Ignore localStorage errors.
+    }
+  }, [
+    activeLessonId,
+    activeModule,
+    activeTab,
+    coachTimeFilter,
+    coachTopicFilter,
+    expandedModuleId,
+    hasLoadedStoredState,
+    moduleFilter,
+    selectedSessionId,
+    viewMode,
+  ]);
 
   useEffect(() => {
     function handleEngagementUpdate(event: Event) {
@@ -860,6 +962,19 @@ export default function StatsPage() {
       isMounted = false;
     };
   }, [fetchSessions]);
+
+  useEffect(() => {
+    if (!restoredActiveModuleId || modules.length === 0) {
+      return;
+    }
+
+    const restoredModule = modules.find((module) => module.id === restoredActiveModuleId) ?? null;
+    if (restoredModule) {
+      setActiveModule(restoredModule);
+    }
+
+    setRestoredActiveModuleId(null);
+  }, [modules, restoredActiveModuleId]);
 
   const modulesSorted = [...modules].sort((a, b) => a.order_index - b.order_index);
   const unlockedByModuleId: Record<string, boolean> = {};
@@ -1525,7 +1640,7 @@ export default function StatsPage() {
 
     const stillVisible = coachSessionsSorted.some((session) => session.id === selectedSessionId);
     if (!stillVisible) {
-      setSelectedSessionId(null);
+      setSelectedSessionId(coachSessionsSorted[0]?.id ?? null);
     }
   }, [coachSessionsSorted, selectedSessionId]);
 
