@@ -2563,7 +2563,7 @@ export default function StatsPage() {
                           </div>
                         )}
 
-                        {coachSessionsSorted.map((session) => {
+                        {coachSessionsSorted.map((session, index) => {
                           const isSelectedSession = selectedSessionId === session.id;
                           const scheduledAtTs = parseDate(session.scheduled_at);
                           const isDone = session.status?.toLowerCase() === "completed";
@@ -2588,11 +2588,13 @@ export default function StatsPage() {
                                   <h4 className="tf-moduleTitle tf-clamp2">{session.theme ?? "Séance libre (sujet au choix)"}</h4>
                                   <span className={`tf-moduleBadge tf-moduleBadge--small ${sessionBadgeClass}`}>{sessionBadgeLabel}</span>
                                 </div>
-                                <div className="tf-sessionDateMeta">
-                                  {scheduledAtTs !== null
-                                    ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(scheduledAtTs))
-                                    : "À programmer"}
-                                </div>
+                                <span
+                                  className="card-meta"
+                                  aria-label={`Séance numéro ${index + 1}`}
+                                  style={{ fontWeight: 700, fontSize: 14, whiteSpace: "nowrap" }}
+                                >
+                                  {index + 1}
+                                </span>
                               </div>
                             </button>
                           );
