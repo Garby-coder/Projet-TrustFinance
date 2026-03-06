@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { registerEngagementAction } from "../lib/engagement";
 import { supabase } from "../lib/supabase";
 
@@ -474,6 +474,8 @@ function shuffleWithRng<T>(array: T[], rng: () => number) {
 }
 
 export default function StatsPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
@@ -536,6 +538,7 @@ export default function StatsPage() {
   const [taskTogglePendingId, setTaskTogglePendingId] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(false);
+  const [showPilotageSoon, setShowPilotageSoon] = useState(false);
   const [profileEngagement, setProfileEngagement] = useState<ProfileEngagement>(EMPTY_PROFILE_ENGAGEMENT);
   const [isAdmin, setIsAdmin] = useState(false);
   const [restoredActiveModuleId, setRestoredActiveModuleId] = useState<string | null>(null);
@@ -2476,6 +2479,9 @@ export default function StatsPage() {
     })();
   }
 
+  const isAccompagnementActive = location.pathname === "/" || location.pathname === "/stats";
+  const isAdminActive = location.pathname === "/admin";
+
   return (
     <>
       {error && <div className="error-box">{error}</div>}
@@ -2484,17 +2490,48 @@ export default function StatsPage() {
       {!loading && (
         <section className="tf-dashboard">
           <aside className="tf-sidebar tf-card tf-card--flat">
-            <span className="tf-chip tf-chip--accent">TF</span>
-            <span className="tf-chip" aria-hidden="true">◻</span>
-            <span className="tf-chip" aria-hidden="true">◯</span>
-            {isAdmin && (
-              <Link to="/admin" className="tf-chip tf-chip--accent tf-sidebarAdminLink">
-                Administrateur
-              </Link>
-            )}
-            <div style={{ marginTop: "auto" }}>
-              <span className="tf-chip">1</span>
-            </div>
+            <div className="tf-sidebarLogo">TF</div>
+            <nav className="tf-sidebarMenu" aria-label="Navigation principale">
+              <button
+                type="button"
+                className={`tf-sidebarItem${isAccompagnementActive ? " tf-sidebarItemActive" : ""}`}
+                onClick={() => {
+                  setViewMode("accompagnement");
+                  navigate("/");
+                }}
+                aria-current={isAccompagnementActive ? "page" : undefined}
+              >
+                <span className="tf-sidebarIcon" aria-hidden="true">
+                  ◈
+                </span>
+                <span className="tf-sidebarLabel">Accompagnement</span>
+              </button>
+
+              <button
+                type="button"
+                className="tf-sidebarItem"
+                onClick={() => setShowPilotageSoon(true)}
+              >
+                <span className="tf-sidebarIcon" aria-hidden="true">
+                  ◔
+                </span>
+                <span className="tf-sidebarLabel">Pilotage</span>
+              </button>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  className={`tf-sidebarItem${isAdminActive ? " tf-sidebarItemActive" : ""}`}
+                  onClick={() => navigate("/admin")}
+                  aria-current={isAdminActive ? "page" : undefined}
+                >
+                  <span className="tf-sidebarIcon" aria-hidden="true">
+                    ◉
+                  </span>
+                  <span className="tf-sidebarLabel">Administrateur</span>
+                </button>
+              )}
+            </nav>
           </aside>
 
           <main className="tf-dashboardMain">
@@ -2964,6 +3001,30 @@ export default function StatsPage() {
             </div>
           </main>
         </section>
+      )}
+
+      {showPilotageSoon && (
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowPilotageSoon(false)}>
+          <div
+            className="modal-panel tf-modalPanel tf-card"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(480px, 100%)", maxHeight: "80vh" }}
+          >
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title tf-title">Pilotage</h3>
+                <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
+                  En travaux — reviens plus tard.
+                </p>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" className="btn" onClick={() => setShowPilotageSoon(false)}>
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showExpandedContent && ((viewMode === "accompagnement" && activeModule) || (viewMode === "coaching" && selectedCoachSession)) && (

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 type AdminUser = {
@@ -43,6 +43,8 @@ function formatSessionLabel(session: AdminSession) {
 }
 
 export default function AdminPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -53,6 +55,7 @@ export default function AdminPage() {
   const [showUsersDropdown, setShowUsersDropdown] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
+  const [showPilotageSoon, setShowPilotageSoon] = useState(false);
   const [pageMessage, setPageMessage] = useState("");
   const [pageError, setPageError] = useState("");
 
@@ -153,8 +156,14 @@ export default function AdminPage() {
         method: "GET",
       });
 
-      const nextSessions = Array.isArray(payload?.sessions)
-        ? payload.sessions
+      const sourceRows = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.sessions)
+          ? payload.sessions
+          : [];
+
+      const nextSessions = Array.isArray(sourceRows)
+        ? sourceRows
             .map((row) => {
               const session = row as Record<string, unknown>;
               return {
@@ -359,120 +368,189 @@ export default function AdminPage() {
     return <Navigate to="/" replace />;
   }
 
+  const isAccompagnementActive = location.pathname === "/" || location.pathname === "/stats";
+  const isAdminActive = location.pathname === "/admin";
+
   return (
     <>
-      <section className="tf-adminPage">
-        <header className="tf-adminPageHeader">
-          <div>
-            <h2 className="tf-title" style={{ margin: 0 }}>
-              Administrateur
-            </h2>
-            <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
-              Sélectionne un élève puis lance les actions de suivi.
-            </p>
-          </div>
-        </header>
-
-        <section className="tf-adminSelectCard tf-card">
-          <label className="tf-subtitle" htmlFor="admin-user-search">
-            Élève
-          </label>
-          <div className="tf-adminSelectDropdown" ref={dropdownRef}>
-            <input
-              id="admin-user-search"
-              type="text"
-              className="tf-adminInput"
-              placeholder="Rechercher un élève par email"
-              value={searchValue}
-              onFocus={() => setShowUsersDropdown(true)}
-              onChange={(event) => {
-                setSearchValue(event.target.value);
-                setShowUsersDropdown(true);
-              }}
-            />
-
-            {showUsersDropdown && (
-              <div className="tf-adminDropdownList">
-                {filteredUsers.length === 0 && <div className="tf-adminDropdownEmpty">Aucun élève trouvé.</div>}
-                {filteredUsers.map((user) => {
-                  const isSelected = user.id === selectedUserId;
-                  return (
-                    <button
-                      key={user.id}
-                      type="button"
-                      className={`tf-adminDropdownItem${isSelected ? " isActive" : ""}`}
-                      onClick={() => {
-                        setSelectedUserId(user.id);
-                        setSearchValue(user.email);
-                        setShowUsersDropdown(false);
-                        setPageError("");
-                        setPageMessage("");
-                      }}
-                    >
-                      {user.email}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {usersLoading && <p className="tf-muted">Chargement des élèves...</p>}
-          {usersError && <div className="error-box">{usersError}</div>}
-          {selectedUser && !usersLoading && <p className="tf-muted">Élève sélectionné : {selectedUser.email}</p>}
-        </section>
-
-        <section className="tf-adminActionGrid">
-          <article className="tf-adminActionCard tf-card">
-            <h3 className="tf-title" style={{ margin: 0 }}>
-              Ajouter une tâche
-            </h3>
-            <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
-              Crée une tâche personnalisée pour l&apos;élève sélectionné.
-            </p>
+      <section className="tf-dashboard">
+        <aside className="tf-sidebar tf-card tf-card--flat">
+          <div className="tf-sidebarLogo">TF</div>
+          <nav className="tf-sidebarMenu" aria-label="Navigation principale">
             <button
               type="button"
-              className="tf-adminCtaPrimary"
-              disabled={!hasSelectedUser}
-              onClick={() => {
-                setTaskError("");
-                setShowTaskModal(true);
-              }}
+              className={`tf-sidebarItem${isAccompagnementActive ? " tf-sidebarItemActive" : ""}`}
+              onClick={() => navigate("/")}
+              aria-current={isAccompagnementActive ? "page" : undefined}
             >
-              Ajouter une tâche
+              <span className="tf-sidebarIcon" aria-hidden="true">
+                ◈
+              </span>
+              <span className="tf-sidebarLabel">Accompagnement</span>
             </button>
-          </article>
 
-          <article className="tf-adminActionCard tf-card">
-            <h3 className="tf-title" style={{ margin: 0 }}>
-              Séance terminée
-            </h3>
-            <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
-              Valide une séance et publie le replay et la synthèse.
-            </p>
+            <button type="button" className="tf-sidebarItem" onClick={() => setShowPilotageSoon(true)}>
+              <span className="tf-sidebarIcon" aria-hidden="true">
+                ◔
+              </span>
+              <span className="tf-sidebarLabel">Pilotage</span>
+            </button>
+
             <button
               type="button"
-              className="tf-adminCtaPrimary tf-adminCtaPrimary--session"
-              disabled={!hasSelectedUser}
-              onClick={() => {
-                setSessionSubmitError("");
-                setShowSessionModal(true);
-              }}
+              className={`tf-sidebarItem${isAdminActive ? " tf-sidebarItemActive" : ""}`}
+              onClick={() => navigate("/admin")}
+              aria-current={isAdminActive ? "page" : undefined}
             >
-              Valider la séance
+              <span className="tf-sidebarIcon" aria-hidden="true">
+                ◉
+              </span>
+              <span className="tf-sidebarLabel">Administrateur</span>
             </button>
-          </article>
-        </section>
+          </nav>
+        </aside>
 
-        {!hasSelectedUser && (
-          <div className="tf-adminCenterMessage">
-            Sélectionne un élève pour activer les actions administrateur.
+        <main className="tf-dashboardMain">
+          <div className="tf-card tf-card--flat tf-scroll" style={{ padding: 14 }}>
+            <section className="tf-adminPage">
+              <header className="tf-adminPageHeader">
+                <div>
+                  <h2 className="tf-title" style={{ margin: 0 }}>
+                    Administrateur
+                  </h2>
+                  <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
+                    Sélectionne un élève puis lance les actions de suivi.
+                  </p>
+                </div>
+              </header>
+
+              <section className="tf-adminSelectCard tf-card">
+                <label className="tf-subtitle" htmlFor="admin-user-search">
+                  Élève
+                </label>
+                <div className="tf-adminSelectDropdown" ref={dropdownRef}>
+                  <input
+                    id="admin-user-search"
+                    type="text"
+                    className="tf-adminInput"
+                    placeholder="Rechercher un élève par email"
+                    value={searchValue}
+                    onFocus={() => setShowUsersDropdown(true)}
+                    onChange={(event) => {
+                      setSearchValue(event.target.value);
+                      setShowUsersDropdown(true);
+                    }}
+                  />
+
+                  {showUsersDropdown && (
+                    <div className="tf-adminDropdownList">
+                      {filteredUsers.length === 0 && <div className="tf-adminDropdownEmpty">Aucun élève trouvé.</div>}
+                      {filteredUsers.map((user) => {
+                        const isSelected = user.id === selectedUserId;
+                        return (
+                          <button
+                            key={user.id}
+                            type="button"
+                            className={`tf-adminDropdownItem${isSelected ? " isActive" : ""}`}
+                            onClick={() => {
+                              setSelectedUserId(user.id);
+                              setSearchValue(user.email);
+                              setShowUsersDropdown(false);
+                              setPageError("");
+                              setPageMessage("");
+                            }}
+                          >
+                            {user.email}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {usersLoading && <p className="tf-muted">Chargement des élèves...</p>}
+                {usersError && <div className="error-box">{usersError}</div>}
+                {selectedUser && !usersLoading && <p className="tf-muted">Élève sélectionné : {selectedUser.email}</p>}
+              </section>
+
+              <section className="tf-adminActionGrid">
+                <article className="tf-adminActionCard tf-card">
+                  <h3 className="tf-title" style={{ margin: 0 }}>
+                    Ajouter une tâche
+                  </h3>
+                  <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
+                    Crée une tâche personnalisée pour l&apos;élève sélectionné.
+                  </p>
+                  <button
+                    type="button"
+                    className="tf-adminCtaPrimary"
+                    disabled={!hasSelectedUser}
+                    onClick={() => {
+                      setTaskError("");
+                      setShowTaskModal(true);
+                    }}
+                  >
+                    Ajouter une tâche
+                  </button>
+                </article>
+
+                <article className="tf-adminActionCard tf-card">
+                  <h3 className="tf-title" style={{ margin: 0 }}>
+                    Séance terminée
+                  </h3>
+                  <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
+                    Valide une séance et publie le replay et la synthèse.
+                  </p>
+                  <button
+                    type="button"
+                    className="tf-adminCtaPrimary tf-adminCtaPrimary--session"
+                    disabled={!hasSelectedUser}
+                    onClick={() => {
+                      setSessionSubmitError("");
+                      setShowSessionModal(true);
+                    }}
+                  >
+                    Valider la séance
+                  </button>
+                </article>
+              </section>
+
+              {!hasSelectedUser && (
+                <div className="tf-adminCenterMessage">
+                  Sélectionne un élève pour activer les actions administrateur.
+                </div>
+              )}
+
+              {pageMessage && <div className="empty-state">{pageMessage}</div>}
+              {pageError && <div className="error-box">{pageError}</div>}
+            </section>
           </div>
-        )}
-
-        {pageMessage && <div className="empty-state">{pageMessage}</div>}
-        {pageError && <div className="error-box">{pageError}</div>}
+        </main>
       </section>
+
+      {showPilotageSoon && (
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowPilotageSoon(false)}>
+          <div
+            className="modal-panel tf-modalPanel tf-card"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(480px, 100%)", maxHeight: "80vh" }}
+          >
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title tf-title">Pilotage</h3>
+                <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>
+                  En travaux — reviens plus tard.
+                </p>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" className="btn" onClick={() => setShowPilotageSoon(false)}>
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showTaskModal && (
         <div className="modal-backdrop tf-modalBackdrop" onClick={closeTaskModal}>

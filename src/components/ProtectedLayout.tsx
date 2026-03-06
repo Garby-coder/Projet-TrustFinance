@@ -112,7 +112,7 @@ export default function ProtectedLayout() {
 
   const level = engagement ? Math.floor(Math.max(0, engagement.xp) / 200) + 1 : null;
   const cadenceLabel = engagement?.cadence_unit === "day" ? "jour" : "semaine";
-  const isDashboardRoute = location.pathname === "/";
+  const isDashboardRoute = location.pathname === "/" || location.pathname === "/admin";
 
   if (isDashboardRoute) {
     return <Outlet />;

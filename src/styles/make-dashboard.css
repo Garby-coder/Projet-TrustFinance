@@ -86,7 +86,7 @@
   height: 100vh;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-columns: 116px minmax(0, 1fr);
   gap: 16px;
   padding: 16px;
 }
@@ -98,8 +98,69 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 14px 10px;
-  gap: 18px;
+  padding: 16px 10px;
+  gap: 16px;
+}
+
+.tf-sidebarLogo {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(175, 135, 50, 0.42);
+  background: rgba(175, 135, 50, 0.14);
+  color: var(--text);
+}
+
+.tf-sidebarMenu {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.tf-sidebarItem {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 6px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.tf-sidebarItem:hover {
+  color: var(--text2);
+  border-color: var(--border2);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tf-sidebarItemActive {
+  color: var(--text);
+  border-color: rgba(175, 135, 50, 0.35);
+  background: rgba(175, 135, 50, 0.16);
+}
+
+.tf-sidebarIcon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tf-sidebarLabel {
+  font-size: 11px;
+  line-height: 1.12;
+  font-weight: 650;
 }
 
 .tf-dashboardMain {
@@ -1061,7 +1122,7 @@ a.tf-startCta:active,
 
 @media (max-width: 1200px) {
   .tf-dashboard {
-    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-columns: 96px minmax(0, 1fr);
   }
 
   .tf-topRow {
@@ -1487,12 +1548,6 @@ a.tf-startCta:active,
   .tf-profileStatsGrid {
     grid-template-columns: 1fr;
   }
-}
-
-.tf-sidebarAdminLink {
-  text-decoration: none;
-  text-align: center;
-  width: 100%;
 }
 
 .tf-adminPage {
