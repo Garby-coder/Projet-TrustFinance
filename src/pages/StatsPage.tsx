@@ -2504,6 +2504,28 @@ export default function StatsPage() {
       <path d="m9.5 12 1.7 1.7 3.3-3.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
+  const trophyIcon = (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 4.5h8v3.2a4 4 0 0 1-8 0V4.5Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M6 6.5H4.8a1.8 1.8 0 0 0 0 3.6H7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M18 6.5h1.2a1.8 1.8 0 0 1 0 3.6H17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M12 11.8v2.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M9.5 18.5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+  const calendarIcon = (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4" y="5.5" width="16" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8 3.8v3.2M16 3.8v3.2M4 9.2h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8.2 13h2.1M13.7 13h2.1M8.2 16.2h2.1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+  const userIcon = (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="8.5" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M5.2 19.2c1.4-2.7 3.8-4.2 6.8-4.2s5.4 1.5 6.8 4.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
 
   function NavItem({
     label,
@@ -2567,7 +2589,7 @@ export default function StatsPage() {
                   aria-expanded={showViewModeMenu}
                 >
                   <div className="tf-topSelectRow">
-                    <span className="tf-quickIcon" aria-hidden="true">◈</span>
+                    <span className="tf-quickIcon" aria-hidden="true">{academyIcon}</span>
                     <span className="tf-topSelectText">{viewMode === "coaching" ? "Coaching" : "Accompagnement"}</span>
                     <span className="tf-topChevron" aria-hidden="true">
                       <svg viewBox="0 0 24 24" fill="none">
@@ -2614,7 +2636,7 @@ export default function StatsPage() {
                   onClick={handleOpenFormationAction}
                   disabled={!nextFormationAction}
                 >
-                  <span className="tf-quickIcon" aria-hidden="true">▶</span>
+                  <span className="tf-quickIcon" aria-hidden="true">▷</span>
                   <div className="tf-quickText">
                     <div className="tf-quickTitle">Start</div>
                     <div className="tf-quickMeta">{nextFormationAction ? "Reprendre la prochaine leçon" : "Choisis un module"}</div>
@@ -2630,7 +2652,7 @@ export default function StatsPage() {
                   }}
                   disabled={tasks.length === 0}
                 >
-                  <span className="tf-quickIcon" aria-hidden="true">◌</span>
+                  <span className="tf-quickIcon" aria-hidden="true">{trophyIcon}</span>
                   <div className="tf-quickText">
                     <div className="tf-quickTitle">Mes tâches</div>
                     <div className="tf-quickMeta">{todoTasks.length} à faire</div>
@@ -2645,7 +2667,7 @@ export default function StatsPage() {
                     setIsCalendarOpen(true);
                   }}
                 >
-                  <span className="tf-quickIcon" aria-hidden="true">◷</span>
+                  <span className="tf-quickIcon" aria-hidden="true">{calendarIcon}</span>
                   <div className="tf-quickText">
                     <div className="tf-quickTitle">Calendrier</div>
                     <div className="tf-quickMeta">{sessionsCountInCurrentMonth} jour(x) ce mois-ci</div>
@@ -2656,7 +2678,7 @@ export default function StatsPage() {
                   className="card-button tf-card tf-quickCard"
                   onClick={() => setShowProfileModal(true)}
                 >
-                  <span className="tf-quickIcon" aria-hidden="true">◍</span>
+                  <span className="tf-quickIcon" aria-hidden="true">{userIcon}</span>
                   <div className="tf-quickText">
                     <div className="tf-quickTitle">Profil</div>
                     <div className="tf-quickMeta">{currentBadge ? currentBadge.name : "Aucun badge"}</div>
