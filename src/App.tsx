@@ -10,6 +10,7 @@ import { registerEngagementAction } from "./lib/engagement";
 
 import Login from "./pages/Login";
 import StatsPage from "./pages/StatsPage";
+import AdminPage from "./pages/AdminPage";
 
 type UserEngagement = {
   user_id: string;
@@ -31,7 +32,7 @@ const CADENCE_OPTIONS: CadenceOption[] = [
   { id: "once-per-week", label: "1 fois par semaine", cadence_unit: "week", cadence_target: 1 },
 ];
 const LAST_PATH_STORAGE_KEY = "tf:lastPath";
-const RESTORABLE_LAST_PATHS = new Set(["/stats", "/formation", "/seances"]);
+const RESTORABLE_LAST_PATHS = new Set(["/stats", "/formation", "/seances", "/admin"]);
 
 function getCadenceSelection(engagement: UserEngagement | null): CadenceOption["id"] {
   if (!engagement) {
@@ -411,6 +412,7 @@ export default function App() {
 
           <Route path="/" element={isAuthed ? <ProtectedLayout /> : <Navigate to="/login" replace />}>
             <Route index element={<StatsPage />} />
+            <Route path="admin" element={<AdminPage />} />
             <Route path="seances" element={<Navigate to="/" replace />} />
             <Route path="formation" element={<Navigate to="/" replace />} />
           </Route>

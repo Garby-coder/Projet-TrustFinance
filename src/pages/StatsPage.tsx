@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { registerEngagementAction } from "../lib/engagement";
 import { supabase } from "../lib/supabase";
 
@@ -536,6 +537,7 @@ export default function StatsPage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(false);
   const [profileEngagement, setProfileEngagement] = useState<ProfileEngagement>(EMPTY_PROFILE_ENGAGEMENT);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [restoredActiveModuleId, setRestoredActiveModuleId] = useState<string | null>(null);
   const [hasLoadedStoredState, setHasLoadedStoredState] = useState(false);
   const moduleRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -793,9 +795,22 @@ export default function StatsPage() {
 
       if (!currentUserId) {
         setError("Impossible d'identifier l'utilisateur.");
+        setIsAdmin(false);
         setLoading(false);
         return;
       }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", currentUserId)
+        .maybeSingle();
+
+      if (!isMounted) {
+        return;
+      }
+
+      setIsAdmin(!profileError && profileData?.is_admin === true);
 
       const { data: userEngagementRow, error: userEngagementError } = await supabase
         .from("user_engagement")
@@ -2472,6 +2487,11 @@ export default function StatsPage() {
             <span className="tf-chip tf-chip--accent">TF</span>
             <span className="tf-chip" aria-hidden="true">◻</span>
             <span className="tf-chip" aria-hidden="true">◯</span>
+            {isAdmin && (
+              <Link to="/admin" className="tf-chip tf-chip--accent tf-sidebarAdminLink">
+                Administrateur
+              </Link>
+            )}
             <div style={{ marginTop: "auto" }}>
               <span className="tf-chip">1</span>
             </div>

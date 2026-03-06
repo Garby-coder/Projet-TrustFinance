@@ -1488,3 +1488,205 @@ a.tf-startCta:active,
     grid-template-columns: 1fr;
   }
 }
+
+.tf-sidebarAdminLink {
+  text-decoration: none;
+  text-align: center;
+  width: 100%;
+}
+
+.tf-adminPage {
+  display: grid;
+  gap: 14px;
+}
+
+.tf-adminPageHeader {
+  border: 1px solid var(--border);
+  border-radius: var(--radiusSm);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 14px;
+}
+
+.tf-adminSelectCard {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.tf-adminSelectDropdown {
+  position: relative;
+}
+
+.tf-adminDropdownList {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(17, 17, 17, 0.98);
+  box-shadow: var(--shadow);
+  padding: 6px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.tf-adminDropdownItem {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text2);
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+}
+
+.tf-adminDropdownItem:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.tf-adminDropdownItem.isActive {
+  border-color: rgba(175, 135, 50, 0.35);
+  background: rgba(175, 135, 50, 0.16);
+  color: var(--text);
+}
+
+.tf-adminDropdownEmpty {
+  padding: 10px 12px;
+  color: var(--muted);
+}
+
+.tf-adminActionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.tf-adminActionCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.tf-adminCenterMessage {
+  border: 1px dashed var(--border);
+  border-radius: var(--radiusSm);
+  background: rgba(255, 255, 255, 0.02);
+  min-height: 92px;
+  display: grid;
+  place-items: center;
+  color: var(--text2);
+  text-align: center;
+  padding: 16px;
+}
+
+.tf-adminInput,
+.tf-adminTextarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.tf-adminInput:focus,
+.tf-adminTextarea:focus {
+  outline: none;
+  border-color: rgba(175, 135, 50, 0.45);
+  box-shadow: 0 0 0 2px rgba(175, 135, 50, 0.16);
+}
+
+.tf-adminTextarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.tf-adminModalField {
+  display: grid;
+  gap: 8px;
+}
+
+.tf-adminPriorityRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tf-adminPriorityPill {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tf-adminPriorityPill--low {
+  background: #1a212d;
+  color: #3b82f6;
+}
+
+.tf-adminPriorityPill--medium {
+  background: #2d1f16;
+  color: #f97316;
+}
+
+.tf-adminPriorityPill--high {
+  background: #2c1b1b;
+  color: #e94343;
+}
+
+.tf-adminPriorityPill.isActive {
+  border-color: rgba(175, 135, 50, 0.35);
+  box-shadow: 0 0 0 1px rgba(175, 135, 50, 0.25);
+}
+
+.tf-adminModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tf-adminCtaPrimary,
+.tf-adminCtaSecondary {
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  padding: 0 14px;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.tf-adminCtaPrimary {
+  border-color: rgba(175, 135, 50, 0.45);
+  background: linear-gradient(135deg, rgba(175, 135, 50, 0.32), rgba(120, 89, 31, 0.52));
+}
+
+.tf-adminCtaPrimary--session {
+  border-color: rgba(92, 189, 116, 0.55);
+  background: linear-gradient(135deg, rgba(45, 147, 91, 0.38), rgba(175, 135, 50, 0.36));
+}
+
+.tf-adminCtaSecondary {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tf-adminCtaPrimary:disabled,
+.tf-adminCtaSecondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 860px) {
+  .tf-adminActionGrid {
+    grid-template-columns: 1fr;
+  }
+}
