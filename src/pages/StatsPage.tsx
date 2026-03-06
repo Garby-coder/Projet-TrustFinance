@@ -93,6 +93,7 @@ type QuizQuestion = QuizQuestionRow & {
 };
 
 type ModuleFilter = "all" | "todo" | "done";
+type SessionUiState = "to_schedule" | "scheduled" | "awaiting_validation" | "done";
 type PersistedStatsState = {
   viewMode?: "accompagnement" | "coaching";
   coachTimeFilter?: "all" | "upcoming" | "past";
@@ -157,6 +158,19 @@ function formatDate(dateValue: string | null | undefined) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(timestamp));
+}
+
+function getSessionUiState(session: Pick<SessionItem, "status" | "scheduled_at">): SessionUiState {
+  if (session.status?.toLowerCase() === "completed") {
+    return "done";
+  }
+
+  if (!session.scheduled_at) {
+    return "to_schedule";
+  }
+
+  const sessionTimestamp = new Date(session.scheduled_at).getTime();
+  return sessionTimestamp < Date.now() ? "awaiting_validation" : "scheduled";
 }
 
 function isDoneTask(task: TaskItem) {
@@ -1420,12 +1434,12 @@ export default function StatsPage() {
       return true;
     }
 
-    const scheduledAt = parseDate(session.scheduled_at);
+    const uiState = getSessionUiState(session);
     if (coachTimeFilter === "upcoming") {
-      return session.status?.toLowerCase() === "planned" && scheduledAt !== null && scheduledAt >= now;
+      return uiState === "scheduled";
     }
 
-    return session.status?.toLowerCase() === "completed" || (scheduledAt !== null && scheduledAt < now);
+    return uiState === "done" || uiState === "awaiting_validation";
   });
 
   const coachSessionsSorted = [...coachSessionsFilteredByTime].sort((a, b) => {
@@ -1493,15 +1507,17 @@ export default function StatsPage() {
   const selectedCoachSession =
     (selectedSessionId ? coachSessionsSorted.find((session) => session.id === selectedSessionId) : null) ?? null;
 
-  const selectedCoachSessionScheduledAt = parseDate(selectedCoachSession?.scheduled_at ?? null);
-  const isSelectedCoachSessionDone = selectedCoachSession?.status?.toLowerCase() === "completed";
-  const isSelectedCoachSessionPlanned = selectedCoachSession?.status?.toLowerCase() === "planned";
-  const isSelectedCoachSessionToPlan = isSelectedCoachSessionPlanned && selectedCoachSessionScheduledAt === null;
-  const isSelectedCoachSessionProgrammed = isSelectedCoachSessionPlanned && selectedCoachSessionScheduledAt !== null;
+  const selectedCoachSessionUiState = selectedCoachSession ? getSessionUiState(selectedCoachSession) : null;
+  const isSelectedCoachSessionDone = selectedCoachSessionUiState === "done";
+  const isSelectedCoachSessionToPlan = selectedCoachSessionUiState === "to_schedule";
+  const isSelectedCoachSessionProgrammed = selectedCoachSessionUiState === "scheduled";
+  const isSelectedCoachSessionAwaitingValidation = selectedCoachSessionUiState === "awaiting_validation";
 
   const coachingHeaderStatus = selectedCoachSession
     ? isSelectedCoachSessionDone
       ? { label: "Faite", className: "tf-chip tf-chip--done" }
+      : isSelectedCoachSessionAwaitingValidation
+        ? { label: "En attente", className: "tf-chip tf-chip--awaiting" }
       : isSelectedCoachSessionProgrammed
         ? { label: "Programmée", className: "tf-chip tf-chip--planned" }
         : { label: "À programmer", className: "tf-chip" }
@@ -2046,6 +2062,23 @@ export default function StatsPage() {
               disabled={!isValidHttpUrl(resolveSessionBookingUrl(selectedCoachSession))}
             >
               Reprogrammer la séance
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (isSelectedCoachSessionAwaitingValidation) {
+      const plannedDateLabel = formatDate(selectedCoachSession.scheduled_at) ?? "date non disponible";
+      return (
+        <div className="tf-paneStack">
+          <h3 className="tf-title" style={{ margin: 0 }}>Séance en attente de validation</h3>
+          <p className="tf-subtitle" style={{ margin: 0 }}>
+            Ta séance du {plannedDateLabel} est terminée. Notre équipe ajoute le replay et la synthèse.
+          </p>
+          <div>
+            <button type="button" className="tf-btn" disabled>
+              Validation en cours
             </button>
           </div>
         </div>
@@ -2784,15 +2817,24 @@ export default function StatsPage() {
 
                         {coachSessionsSorted.map((session, index) => {
                           const isSelectedSession = selectedSessionId === session.id;
-                          const scheduledAtTs = parseDate(session.scheduled_at);
-                          const isDone = session.status?.toLowerCase() === "completed";
-                          const isProgrammed = session.status?.toLowerCase() === "planned" && scheduledAtTs !== null;
-                          const sessionBadgeLabel = isDone ? "Faite" : isProgrammed ? "Programmée" : "À programmer";
-                          const sessionBadgeClass = isDone
-                            ? "tf-sessionBadge tf-sessionBadge--done"
-                            : isProgrammed
-                              ? "tf-sessionBadge tf-sessionBadge--planned"
-                              : "tf-sessionBadge tf-sessionBadge--todo";
+                          const sessionUiState = getSessionUiState(session);
+                          const sessionBadgeLabel =
+                            sessionUiState === "done"
+                              ? "Faite"
+                              : sessionUiState === "scheduled"
+                                ? "Programmée"
+                                : sessionUiState === "awaiting_validation"
+                                  ? "En attente"
+                                  : "À programmer";
+                          const sessionBadgeClass =
+                            sessionUiState === "done"
+                              ? "tf-sessionBadge tf-sessionBadge--done"
+                              : sessionUiState === "scheduled"
+                                ? "tf-sessionBadge tf-sessionBadge--planned"
+                                : sessionUiState === "awaiting_validation"
+                                  ? "tf-sessionBadge tf-sessionBadge--awaiting"
+                                  : "tf-sessionBadge tf-sessionBadge--todo";
+                          const sessionDateLabel = formatDate(session.scheduled_at);
 
                           return (
                             <button
@@ -2806,6 +2848,11 @@ export default function StatsPage() {
                                 <div className="tf-moduleTitleBlock">
                                   <h4 className="tf-moduleTitle tf-clamp2">{session.theme ?? "Séance libre (sujet au choix)"}</h4>
                                   <span className={`tf-moduleBadge tf-moduleBadge--small ${sessionBadgeClass}`}>{sessionBadgeLabel}</span>
+                                  {sessionUiState === "awaiting_validation" && sessionDateLabel && (
+                                    <span className="card-meta" style={{ whiteSpace: "nowrap" }}>
+                                      {sessionDateLabel}
+                                    </span>
+                                  )}
                                 </div>
                                 <span
                                   className="card-meta"

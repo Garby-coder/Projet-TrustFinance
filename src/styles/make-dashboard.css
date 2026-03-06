@@ -530,6 +530,12 @@ a.tf-startCta:active,
   color: rgba(210, 228, 255, 0.95);
 }
 
+.tf-sessionBadge--awaiting {
+  border: 1px solid rgba(175, 135, 50, 0.45);
+  background: rgba(175, 135, 50, 0.18);
+  color: rgba(255, 235, 205, 0.95);
+}
+
 .tf-sessionBadge--done {
   border: 1px solid rgba(40, 209, 124, 0.35);
   background: rgba(40, 209, 124, 0.14);
@@ -738,6 +744,12 @@ a.tf-startCta:active,
   border-color: rgba(59, 130, 246, 0.35);
   background: rgba(59, 130, 246, 0.14);
   color: rgba(210, 228, 255, 0.95);
+}
+
+.tf-chip--awaiting {
+  border-color: rgba(175, 135, 50, 0.45);
+  background: rgba(175, 135, 50, 0.18);
+  color: rgba(255, 235, 205, 0.95);
 }
 
 .tf-app .section-title,
