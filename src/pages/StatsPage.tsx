@@ -1609,12 +1609,41 @@ export default function StatsPage() {
     })();
   }
 
-  function handleOpenFormationAction() {
-    if (!nextFormationAction) {
+  function handleStartClick() {
+    setViewMode("accompagnement");
+    setShowExpandedContent(false);
+    setShowViewModeMenu(false);
+
+    if (nextFormationAction) {
+      setNeedsAutoSelectLesson(false);
+      openModule(nextFormationAction.module, "lessons", nextFormationAction.lesson.id);
       return;
     }
 
-    openModule(nextFormationAction.module, "lessons", nextFormationAction.lesson.id);
+    if (activeLessonId) {
+      const fallbackLesson = moduleLessons.find((lesson) => lesson.id === activeLessonId) ?? null;
+      const fallbackModule =
+        fallbackLesson?.module_id ? modules.find((module) => module.id === fallbackLesson.module_id) ?? null : null;
+
+      if (fallbackModule && fallbackLesson && unlockedByModuleId[fallbackModule.id] === true) {
+        setNeedsAutoSelectLesson(false);
+        openModule(fallbackModule, "lessons", fallbackLesson.id);
+        return;
+      }
+    }
+
+    const firstUnlockedModuleWithLesson = modulesMeta.find(
+      (moduleMeta) => moduleMeta.isUnlocked && moduleMeta.lessonsForModule.length > 0
+    );
+    const fallbackLessonId = firstUnlockedModuleWithLesson?.lessonsForModule[0]?.id ?? null;
+    if (firstUnlockedModuleWithLesson && fallbackLessonId) {
+      setNeedsAutoSelectLesson(false);
+      openModule(firstUnlockedModuleWithLesson.module, "lessons", fallbackLessonId);
+      return;
+    }
+
+    // Fallback final: laisser l'effet existant choisir la prochaine/dernière leçon dès que possible.
+    setNeedsAutoSelectLesson(true);
   }
 
   async function toggleTaskStatus(task: TaskItem) {
@@ -2633,13 +2662,12 @@ export default function StatsPage() {
                 <button
                   type="button"
                   className="card-button tf-card tf-quickCard tf-startCta"
-                  onClick={handleOpenFormationAction}
-                  disabled={!nextFormationAction}
+                  onClick={handleStartClick}
                 >
                   <span className="tf-quickIcon" aria-hidden="true">▷</span>
                   <div className="tf-quickText">
                     <div className="tf-quickTitle">Start</div>
-                    <div className="tf-quickMeta">{nextFormationAction ? "Reprendre la prochaine leçon" : "Choisis un module"}</div>
+                    <div className="tf-quickMeta">{nextFormationAction ? "Reprendre la prochaine leçon" : "Reprendre ta formation"}</div>
                   </div>
                 </button>
                 <button
