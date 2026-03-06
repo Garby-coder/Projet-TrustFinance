@@ -202,9 +202,15 @@
 
 .tf-topRow {
   display: grid;
-  grid-template-columns: 1.35fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
+}
+
+.tf-topCards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .tf-quickActions {
@@ -332,16 +338,27 @@ a.tf-startCta:active,
 }
 
 .tf-quickIcon {
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border2);
-  color: var(--accent);
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 22px;
+  line-height: 1;
   flex-shrink: 0;
+}
+
+.tf-quickIcon svg {
+  width: 22px;
+  height: 22px;
+  opacity: 0.95;
 }
 
 .tf-quickTitle {
@@ -356,10 +373,18 @@ a.tf-startCta:active,
   margin-top: 4px;
 }
 
-.tf-academyCaret {
+.tf-topChevron {
   margin-left: auto;
-  color: var(--muted);
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tf-topChevron svg {
+  width: 20px;
+  height: 20px;
+  opacity: 0.88;
 }
 
 .tf-contentRow {
