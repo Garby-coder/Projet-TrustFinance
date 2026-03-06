@@ -1,43 +1,18 @@
-const { jsonResponse, normalizeError, requireAdmin } = require("./_admin-auth");
+import { json, requireAdmin } from "./_admin-auth.js";
 
-exports.handler = async function handler(event) {
-  if (event?.httpMethod !== "GET") {
-    return jsonResponse(405, { ok: false, error: "method_not_allowed" });
-  }
+export const handler = async (event) => {
+  if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
 
-  try {
-    const { supabaseUrl, serviceRoleKey } = await requireAdmin(event);
+  const auth = await requireAdmin(event);
+  if (!auth.ok) return json(auth.statusCode, { ok: false, error: auth.error });
 
-    const usersUrl = new URL("/auth/v1/admin/users", supabaseUrl);
-    usersUrl.searchParams.set("page", "1");
-    usersUrl.searchParams.set("per_page", "200");
+  const { data, error } = await auth.supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  if (error) return json(500, { ok: false, error: "list_users_failed" });
 
-    const usersResponse = await fetch(usersUrl, {
-      method: "GET",
-      headers: {
-        apikey: serviceRoleKey,
-        authorization: `Bearer ${serviceRoleKey}`,
-      },
-    });
+  const users = (data?.users || [])
+    .map((u) => ({ id: u.id, email: u.email }))
+    .filter((u) => !!u.email)
+    .sort((a, b) => a.email.localeCompare(b.email));
 
-    if (!usersResponse.ok) {
-      return jsonResponse(500, { ok: false, error: "users_fetch_failed" });
-    }
-
-    const payload = await usersResponse.json().catch(() => null);
-    const users = Array.isArray(payload?.users) ? payload.users : [];
-    const items = users
-      .map((user) => ({
-        id: typeof user?.id === "string" ? user.id : "",
-        email: typeof user?.email === "string" ? user.email : "",
-      }))
-      .filter((user) => user.id && user.email)
-      .sort((a, b) => a.email.localeCompare(b.email, "fr"));
-
-    return jsonResponse(200, { ok: true, users: items });
-  } catch (error) {
-    const normalized = normalizeError(error);
-    return jsonResponse(normalized.status, normalized.payload);
-  }
+  return json(200, { ok: true, users });
 };
-
