@@ -371,10 +371,11 @@ export default function AdminPage() {
   const isAccompagnementActive = location.pathname === "/" || location.pathname === "/stats";
   const isPilotageActive = location.pathname === "/pilotage";
   const isAdminActive = location.pathname === "/admin";
-  const bookIcon = (
+  const academyIcon = (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M5 4.5h6.5a3 3 0 0 1 3 3V20H8a3 3 0 0 0-3 3V4.5Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M19 4.5h-6.5a3 3 0 0 0-3 3V20H16a3 3 0 0 1 3 3V4.5Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m3.5 9.5 8.5-4 8.5 4-8.5 4-8.5-4Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M7 11.5v3.9c0 .9 2.2 2.6 5 2.6s5-1.7 5-2.6v-3.9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M19 11.7v4.1" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </svg>
   );
   const chartIcon = (
@@ -425,7 +426,7 @@ export default function AdminPage() {
         <aside className="tf-sidebar tf-card tf-card--flat">
           <div className="tf-sideLogo">TF</div>
           <nav className="tf-sideNav" aria-label="Navigation principale">
-            <NavItem label="Accompagnement" icon={bookIcon} active={isAccompagnementActive} onClick={() => navigate("/")} />
+            <NavItem label="Académie" icon={academyIcon} active={isAccompagnementActive} onClick={() => navigate("/")} />
             <NavItem label="Pilotage" icon={chartIcon} active={isPilotageActive} onClick={() => setShowPilotageSoon(true)} />
             <NavItem label="Administrateur" icon={shieldIcon} active={isAdminActive} onClick={() => navigate("/admin")} />
           </nav>
