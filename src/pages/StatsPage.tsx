@@ -119,6 +119,8 @@ const SUBJECT_BOOKING_URLS: Record<string, string | undefined> = {
   "Comprendre les marchés financiers et le système bancaire.": import.meta.env.VITE_CALENDLY_SUBJECT_5_URL,
 };
 const STORAGE_KEY = "tf:statsState";
+const LOGIN_EVENT_LIKE_PATTERN = "login:%";
+const STREAK_TIMEZONE = "Europe/Paris";
 
 const COACH_THEME_ORDER = [
   "Présentation de l’accompagnement & Bilan initial.",
@@ -245,6 +247,53 @@ function toLocalDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function toParisDateKey(dateValue: string | number | Date) {
+  return new Date(dateValue).toLocaleDateString("en-CA", { timeZone: STREAK_TIMEZONE });
+}
+
+function getPreviousDateKey(dateKey: string) {
+  const [yearRaw, monthRaw, dayRaw] = dateKey.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return dateKey;
+  }
+
+  const previousDate = new Date(Date.UTC(year, month - 1, day));
+  previousDate.setUTCDate(previousDate.getUTCDate() - 1);
+
+  const previousYear = previousDate.getUTCFullYear();
+  const previousMonth = String(previousDate.getUTCMonth() + 1).padStart(2, "0");
+  const previousDay = String(previousDate.getUTCDate()).padStart(2, "0");
+  return `${previousYear}-${previousMonth}-${previousDay}`;
+}
+
+function computeCurrentLoginStreak(dayKeys: Set<string>) {
+  const todayKey = toParisDateKey(new Date());
+  const yesterdayKey = getPreviousDateKey(todayKey);
+  let endKey = "";
+
+  if (dayKeys.has(todayKey)) {
+    endKey = todayKey;
+  } else if (dayKeys.has(yesterdayKey)) {
+    endKey = yesterdayKey;
+  } else {
+    return 0;
+  }
+
+  let streak = 0;
+  let cursor = endKey;
+
+  while (dayKeys.has(cursor)) {
+    streak += 1;
+    cursor = getPreviousDateKey(cursor);
+  }
+
+  return streak;
 }
 
 function buildCalendlyUrl(baseUrl: string, user: CalendlyUser | null) {
@@ -738,10 +787,6 @@ export default function StatsPage() {
         return;
       }
 
-      if (typeof detail.streak_current === "number") {
-        setStreakCurrent(Math.max(0, detail.streak_current));
-      }
-
       setProfileEngagement((current) => {
         return {
           xp: typeof detail.newXp === "number" ? Math.max(0, detail.newXp) : current.xp,
@@ -843,7 +888,6 @@ export default function StatsPage() {
         };
 
         setProfileEngagement(nextProfileEngagement);
-        setStreakCurrent(nextProfileEngagement.streak_current);
       }
 
       const { data: modulesData, error: modulesError } = await supabase
@@ -1034,6 +1078,54 @@ export default function StatsPage() {
       isMounted = false;
     };
   }, [fetchSessions]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      if (!userId) {
+        if (isMounted) {
+          setStreakCurrent(0);
+        }
+        return;
+      }
+
+      const sinceIso = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from("engagement_events")
+        .select("created_at,event_key")
+        .eq("user_id", userId)
+        .like("event_key", LOGIN_EVENT_LIKE_PATTERN)
+        .gte("created_at", sinceIso)
+        .order("created_at", { ascending: false });
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        if (!isMissingEngagementEventsTable(error)) {
+          console.warn("Impossible de calculer la série depuis engagement_events.", error.message);
+        }
+        setStreakCurrent(0);
+        return;
+      }
+
+      const uniqueLoginDays = new Set<string>();
+      for (const row of (data ?? []) as Array<{ created_at: string | null; event_key: string | null }>) {
+        if (!row.created_at) {
+          continue;
+        }
+        uniqueLoginDays.add(toParisDateKey(row.created_at));
+      }
+
+      setStreakCurrent(computeCurrentLoginStreak(uniqueLoginDays));
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!restoredActiveModuleId || modules.length === 0) {
@@ -1336,6 +1428,7 @@ export default function StatsPage() {
       : "Inconnu";
 
   const cadenceUnitLabel = profileEngagement.cadence_unit === "day" ? "jour" : "semaine";
+  const displayStreakBest = Math.max(profileEngagement.streak_best, streakCurrent);
   const badgesUnlocked = badges.filter((badge) => badge.unlocked);
   const badgesLocked = badges.filter((badge) => !badge.unlocked);
 
@@ -1869,7 +1962,7 @@ export default function StatsPage() {
         .eq("user_id", userId)
         .gte("created_at", startOfMonthIso)
         .lt("created_at", startOfNextMonthIso)
-        .like("event_key", "login:%");
+        .like("event_key", LOGIN_EVENT_LIKE_PATTERN);
 
       if (loginEventsError) {
         if (!isMissingEngagementEventsTable(loginEventsError) && !nextError) {
@@ -3190,11 +3283,11 @@ export default function StatsPage() {
                     <div className="tf-profileStatsGrid">
                       <div className="tf-profileStatItem">
                         <span className="tf-muted">Actuelle</span>
-                        <strong className="tf-title">{profileEngagement.streak_current}</strong>
+                        <strong className="tf-title">{streakCurrent}</strong>
                       </div>
                       <div className="tf-profileStatItem">
                         <span className="tf-muted">Record</span>
-                        <strong className="tf-title">{profileEngagement.streak_best}</strong>
+                        <strong className="tf-title">{displayStreakBest}</strong>
                       </div>
                     </div>
                     <p className="tf-subtitle" style={{ margin: 0 }}>
