@@ -86,15 +86,15 @@
   height: 100vh;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 176px minmax(0, 1fr);
   gap: 16px;
   padding: 16px;
 }
 
 .tf-sidebar {
-  width: 240px;
+  width: 176px;
   height: 100vh;
-  padding: 18px 14px;
+  padding: 16px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -103,9 +103,9 @@
 }
 
 .tf-sideLogo {
-  width: 86px;
-  height: 86px;
-  border-radius: 22px;
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -119,20 +119,20 @@
 
 .tf-sideNav {
   width: 100%;
-  margin-top: 10px;
+  margin-top: 22px;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 22px;
 }
 
 .tf-sideItem {
   width: 100%;
-  max-width: 210px;
-  padding: 18px 14px;
-  border-radius: 22px;
+  max-width: 150px;
+  padding: 14px 10px;
+  border-radius: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -161,23 +161,24 @@
 }
 
 .tf-sideIcon {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .tf-sideIcon svg {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   opacity: 0.92;
 }
 
 .tf-sideLabel {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.15px;
+  opacity: 0.9;
 }
 
 .tf-sidebar {
@@ -1160,7 +1161,7 @@ a.tf-startCta:active,
 
 @media (max-width: 1200px) {
   .tf-dashboard {
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 176px minmax(0, 1fr);
   }
 
   .tf-topRow {
