@@ -86,81 +86,109 @@
   height: 100vh;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 116px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: 16px;
   padding: 16px;
+}
+
+.tf-sidebar {
+  width: 240px;
+  height: 100vh;
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.tf-sideLogo {
+  width: 86px;
+  height: 86px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.tf-sideNav {
+  width: 100%;
+  margin-top: 10px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.tf-sideItem {
+  width: 100%;
+  max-width: 210px;
+  padding: 18px 14px;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.tf-sideItem:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tf-sideItem.is-active {
+  background: rgba(175, 135, 50, 0.16);
+  border: 1px solid rgba(175, 135, 50, 0.55);
+  color: #fff;
+}
+
+.tf-sideItem.is-disabled {
+  opacity: 0.45;
+}
+
+.tf-sideIcon {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tf-sideIcon svg {
+  width: 28px;
+  height: 28px;
+  opacity: 0.92;
+}
+
+.tf-sideLabel {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 .tf-sidebar {
   border-radius: var(--radius);
   border: 1px solid var(--border2);
   background: rgba(255, 255, 255, 0.02);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px 10px;
-  gap: 16px;
 }
 
-.tf-sidebarLogo {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  border: 1px solid rgba(175, 135, 50, 0.42);
-  background: rgba(175, 135, 50, 0.14);
-  color: var(--text);
-}
-
-.tf-sidebarMenu {
-  width: 100%;
-  display: grid;
-  gap: 10px;
-  align-content: start;
-}
-
-.tf-sidebarItem {
-  width: 100%;
+.tf-sidebar .tf-sideItem {
   border: 1px solid transparent;
-  border-radius: 14px;
-  background: transparent;
-  color: var(--muted);
-  padding: 10px 6px;
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  text-align: center;
   text-decoration: none;
-}
-
-.tf-sidebarItem:hover {
-  color: var(--text2);
-  border-color: var(--border2);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.tf-sidebarItemActive {
-  color: var(--text);
-  border-color: rgba(175, 135, 50, 0.35);
-  background: rgba(175, 135, 50, 0.16);
-}
-
-.tf-sidebarIcon {
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.tf-sidebarLabel {
-  font-size: 11px;
-  line-height: 1.12;
-  font-weight: 650;
 }
 
 .tf-dashboardMain {
@@ -595,6 +623,16 @@ a.tf-startCta:active,
   border: 1px solid rgba(175, 135, 50, 0.45);
   background: rgba(175, 135, 50, 0.18);
   color: rgba(255, 235, 205, 0.95);
+}
+
+.tf-chipAwaiting {
+  background: rgba(220, 60, 60, 0.14);
+  border: 1px solid rgba(220, 60, 60, 0.45);
+  color: rgba(255, 140, 140, 0.95);
+}
+
+.tf-chipAwaiting:hover {
+  background: rgba(220, 60, 60, 0.18);
 }
 
 .tf-sessionBadge--done {
@@ -1122,7 +1160,7 @@ a.tf-startCta:active,
 
 @media (max-width: 1200px) {
   .tf-dashboard {
-    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
   }
 
   .tf-topRow {
@@ -1143,8 +1181,32 @@ a.tf-startCta:active,
   }
 
   .tf-sidebar {
+    width: 100%;
+    height: auto;
+    padding: 14px;
     flex-direction: row;
     justify-content: center;
+  }
+
+  .tf-sideLogo {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    font-size: 22px;
+  }
+
+  .tf-sideNav {
+    margin-top: 0;
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .tf-sideItem {
+    max-width: 170px;
+    padding: 12px 10px;
+    border-radius: 16px;
+    gap: 8px;
   }
 
   .tf-contentRow,

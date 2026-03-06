@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
@@ -369,44 +369,65 @@ export default function AdminPage() {
   }
 
   const isAccompagnementActive = location.pathname === "/" || location.pathname === "/stats";
+  const isPilotageActive = location.pathname === "/pilotage";
   const isAdminActive = location.pathname === "/admin";
+  const bookIcon = (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 4.5h6.5a3 3 0 0 1 3 3V20H8a3 3 0 0 0-3 3V4.5Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M19 4.5h-6.5a3 3 0 0 0-3 3V20H16a3 3 0 0 1 3 3V4.5Z" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+  const chartIcon = (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4.5 19.5h15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M7.5 16.5v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M12 16.5V9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M16.5 16.5v-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+  const shieldIcon = (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3.5 5.5 6v5.6c0 4 2.5 7.5 6.5 8.9 4-1.4 6.5-4.9 6.5-8.9V6L12 3.5Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m9.5 12 1.7 1.7 3.3-3.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+
+  function NavItem({
+    label,
+    icon,
+    active,
+    onClick,
+    disabled,
+  }: {
+    label: string;
+    icon: ReactNode;
+    active?: boolean;
+    onClick: () => void;
+    disabled?: boolean;
+  }) {
+    return (
+      <button
+        type="button"
+        className={`tf-sideItem${active ? " is-active" : ""}${disabled ? " is-disabled" : ""}`}
+        onClick={onClick}
+        disabled={disabled}
+        aria-current={active ? "page" : undefined}
+      >
+        <div className="tf-sideIcon">{icon}</div>
+        <div className="tf-sideLabel">{label}</div>
+      </button>
+    );
+  }
 
   return (
     <>
       <section className="tf-dashboard">
         <aside className="tf-sidebar tf-card tf-card--flat">
-          <div className="tf-sidebarLogo">TF</div>
-          <nav className="tf-sidebarMenu" aria-label="Navigation principale">
-            <button
-              type="button"
-              className={`tf-sidebarItem${isAccompagnementActive ? " tf-sidebarItemActive" : ""}`}
-              onClick={() => navigate("/")}
-              aria-current={isAccompagnementActive ? "page" : undefined}
-            >
-              <span className="tf-sidebarIcon" aria-hidden="true">
-                ◈
-              </span>
-              <span className="tf-sidebarLabel">Accompagnement</span>
-            </button>
-
-            <button type="button" className="tf-sidebarItem" onClick={() => setShowPilotageSoon(true)}>
-              <span className="tf-sidebarIcon" aria-hidden="true">
-                ◔
-              </span>
-              <span className="tf-sidebarLabel">Pilotage</span>
-            </button>
-
-            <button
-              type="button"
-              className={`tf-sidebarItem${isAdminActive ? " tf-sidebarItemActive" : ""}`}
-              onClick={() => navigate("/admin")}
-              aria-current={isAdminActive ? "page" : undefined}
-            >
-              <span className="tf-sidebarIcon" aria-hidden="true">
-                ◉
-              </span>
-              <span className="tf-sidebarLabel">Administrateur</span>
-            </button>
+          <div className="tf-sideLogo">TF</div>
+          <nav className="tf-sideNav" aria-label="Navigation principale">
+            <NavItem label="Accompagnement" icon={bookIcon} active={isAccompagnementActive} onClick={() => navigate("/")} />
+            <NavItem label="Pilotage" icon={chartIcon} active={isPilotageActive} onClick={() => setShowPilotageSoon(true)} />
+            <NavItem label="Administrateur" icon={shieldIcon} active={isAdminActive} onClick={() => navigate("/admin")} />
           </nav>
         </aside>
 
