@@ -1749,6 +1749,19 @@ a.tf-startCta:active,
   box-shadow: 0 0 0 2px rgba(175, 135, 50, 0.16);
 }
 
+select.tf-adminInput {
+  cursor: pointer;
+}
+
+select.tf-adminInput option {
+  color: #111827;
+  background: #ffffff;
+}
+
+select.tf-adminInput option:disabled {
+  color: #6b7280;
+}
+
 .tf-adminTextarea {
   min-height: 110px;
   resize: vertical;
