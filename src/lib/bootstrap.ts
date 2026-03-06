@@ -71,6 +71,20 @@ async function ensureUserEngagementRow(userId: string) {
 }
 
 export async function ensureDefaultsForUser(userId: string) {
+  const { error: profileUpsertErr } = await supabase
+    .from("profiles")
+    .upsert(
+      {
+        id: userId,
+        is_admin: false,
+      },
+      { onConflict: "id", ignoreDuplicates: true }
+    );
+
+  if (profileUpsertErr && profileUpsertErr.code !== "23505") {
+    throw profileUpsertErr;
+  }
+
   // 1) Sessions : si aucune session pour cet utilisateur -> créer le pack
   const { count: sessionsCount, error: sessionsCountErr } = await supabase
     .from("sessions")
