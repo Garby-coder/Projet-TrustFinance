@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { registerEngagementAction } from "../lib/engagement";
+import { getLevelInfo } from "../lib/leveling";
 import { supabase } from "../lib/supabase";
 
 type ModuleItem = {
@@ -1403,11 +1404,12 @@ export default function StatsPage() {
     .map((badgeId) => badges.find((badge) => badge.id === badgeId))
     .find((badge) => badge?.unlocked === true) ?? null;
 
-  const xpPerLevel = 4000;
   const profileXp = Math.max(0, profileEngagement.xp);
-  const profileLevel = Math.floor(profileXp / xpPerLevel) + 1;
-  const xpInLevel = profileXp % xpPerLevel;
-  const xpProgressPercent = Math.max(0, Math.min(100, Math.round((xpInLevel / xpPerLevel) * 100)));
+  const levelInfo = getLevelInfo(profileXp);
+  const profileLevel = levelInfo.level;
+  const xpInLevel = levelInfo.xpInLevel;
+  const xpPerLevel = levelInfo.xpToNext;
+  const xpProgressPercent = levelInfo.progressPercent;
 
   const totalLessonsCount = moduleLessons.length;
   const completedLessonsCount = Object.values(completedByLessonId).filter((value) => value === true).length;

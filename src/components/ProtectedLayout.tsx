@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { getLevelInfo } from "../lib/leveling";
 import { supabase } from "../lib/supabase";
 
 type EngagementState = {
@@ -110,7 +111,7 @@ export default function ProtectedLayout() {
     await supabase.auth.signOut();
   }
 
-  const level = engagement ? Math.floor(Math.max(0, engagement.xp) / 200) + 1 : null;
+  const levelInfo = engagement ? getLevelInfo(engagement.xp) : null;
   const cadenceLabel = engagement?.cadence_unit === "day" ? "jour" : "semaine";
   const isDashboardRoute = location.pathname === "/" || location.pathname === "/admin";
 
@@ -127,10 +128,10 @@ export default function ProtectedLayout() {
         </div>
 
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          {engagement && level !== null && (
+          {engagement && levelInfo && (
             <div className="card" style={{ padding: "10px 12px", borderRadius: 12, minWidth: 230 }}>
               <p className="card-meta" style={{ margin: 0 }}>
-                Niveau {level} · {engagement.xp} XP
+                Niveau {levelInfo.level} · {levelInfo.xpInLevel.toLocaleString("fr-FR")} / {levelInfo.xpToNext.toLocaleString("fr-FR")} XP
               </p>
               <p className="card-meta" style={{ margin: "4px 0 0" }}>
                 Série: {engagement.streak_current} / record {engagement.streak_best}
