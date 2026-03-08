@@ -60,20 +60,6 @@ const CADENCE_OPTIONS: CadenceOption[] = [
   { id: "once-per-week", label: "1 fois par semaine", cadence_unit: "week", cadence_target: 1 },
 ];
 const AGE_RANGE_OPTIONS = ["Moins de 25 ans", "25 à 34 ans", "35 à 44 ans", "45 à 54 ans", "55 ans et plus"] as const;
-const USE_REASON_OPTIONS = [
-  "Mieux gérer mes finances",
-  "Commencer à investir",
-  "Structurer mon patrimoine",
-  "Préparer ma retraite",
-  "Améliorer ma discipline financière",
-] as const;
-const PRIMARY_GOAL_OPTIONS = [
-  "Constituer une épargne solide",
-  "Générer des revenus passifs",
-  "Investir en autonomie",
-  "Optimiser ma stratégie patrimoniale",
-  "Sécuriser mon avenir financier",
-] as const;
 const EXPERIENCE_LEVEL_OPTIONS = ["Débutant", "Intermédiaire", "Avancé"] as const;
 const DISCOVERY_SOURCE_OPTIONS = ["WhatsApp", "Instagram", "YouTube", "Recommandation", "Recherche web", "Autre"] as const;
 const EMPTY_ONBOARDING_FORM: OnboardingFormState = {
