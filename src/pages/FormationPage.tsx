@@ -826,34 +826,27 @@ export default function FormationPage() {
                       <div style={{ marginTop: 14 }}>
                         <h4 className="subsection-title">{activeLesson.title}</h4>
 
-                        {activeLesson.content_type?.toLowerCase() === "video" && (
-                          <>
-                            {activeLesson.tella_url ? (
-                              <div className="modal-video">
-                                <iframe
-                                  src={activeLesson.tella_url}
-                                  title={activeLesson.title}
-                                  allow="autoplay; fullscreen; picture-in-picture"
-                                  allowFullScreen
-                                />
-                              </div>
-                            ) : (
-                              <div className="empty-state">Vidéo indisponible pour cette leçon.</div>
-                            )}
-                          </>
+                        {(typeof activeLesson.tella_url === "string" && activeLesson.tella_url.trim().length > 0) && (
+                          <div className="modal-video">
+                            <iframe
+                              src={activeLesson.tella_url}
+                              title={activeLesson.title}
+                              allow="autoplay; fullscreen; picture-in-picture"
+                              allowFullScreen
+                            />
+                          </div>
                         )}
 
-                        {activeLesson.content_type?.toLowerCase() === "lecture" && (
-                          <>
-                            {activeLesson.content_markdown ? (
-                              <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
-                                {activeLesson.content_markdown}
-                              </p>
-                            ) : (
-                              <div className="empty-state">Contenu de lecture indisponible pour cette leçon.</div>
-                            )}
-                          </>
+                        {(typeof activeLesson.content_markdown === "string" && activeLesson.content_markdown.trim().length > 0) && (
+                          <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
+                            {activeLesson.content_markdown}
+                          </p>
                         )}
+
+                        {(!activeLesson.tella_url || activeLesson.tella_url.trim().length === 0) &&
+                          (!activeLesson.content_markdown || activeLesson.content_markdown.trim().length === 0) && (
+                            <div className="empty-state">Contenu indisponible pour cette leçon.</div>
+                          )}
 
                         <div style={{ marginTop: 14 }}>
                           <button

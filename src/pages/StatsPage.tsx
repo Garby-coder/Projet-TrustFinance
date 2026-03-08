@@ -2134,6 +2134,9 @@ export default function StatsPage() {
     }
 
     if (activeTab === "lessons" && activeLesson) {
+      const hasVideo = typeof activeLesson.tella_url === "string" && activeLesson.tella_url.trim().length > 0;
+      const hasMarkdown = typeof activeLesson.content_markdown === "string" && activeLesson.content_markdown.trim().length > 0;
+
       return (
         <div className="tf-paneStack">
           {lessonProgressMessage && lessonProgressMessage !== "Leçon terminée." && (
@@ -2142,34 +2145,24 @@ export default function StatsPage() {
             </p>
           )}
 
-          {activeLesson.content_type?.toLowerCase() === "video" && (
-            <>
-              {activeLesson.tella_url ? (
-                <div className="modal-video">
-                  <iframe
-                    src={activeLesson.tella_url}
-                    title={activeLesson.title}
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-              ) : (
-                <div className="empty-state">Vidéo indisponible pour cette leçon.</div>
-              )}
-            </>
+          {hasVideo && (
+            <div className="modal-video">
+              <iframe
+                src={activeLesson.tella_url ?? ""}
+                title={activeLesson.title}
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
           )}
 
-          {activeLesson.content_type?.toLowerCase() === "lecture" && (
-            <>
-              {activeLesson.content_markdown ? (
-                <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
-                  {activeLesson.content_markdown}
-                </p>
-              ) : (
-                <div className="empty-state">Contenu de lecture indisponible pour cette leçon.</div>
-              )}
-            </>
+          {hasMarkdown && (
+            <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
+              {activeLesson.content_markdown}
+            </p>
           )}
+
+          {!hasVideo && !hasMarkdown && <div className="empty-state">Contenu indisponible pour cette leçon.</div>}
         </div>
       );
     }
