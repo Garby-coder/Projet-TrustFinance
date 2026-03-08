@@ -35,8 +35,10 @@ type UserOnboarding = {
   age_range: string | null;
   profession: string | null;
   use_reason: string | null;
+  use_reason_text: string | null;
   primary_goal: string | null;
-  secondary_goals: string | null;
+  primary_goal_text: string | null;
+  secondary_goals: string[] | string | null;
   experience_level: string | null;
   discovery_source: string | null;
   completed_at: string | null;
@@ -54,14 +56,59 @@ type OnboardingFormState = {
   discoverySource: string;
 };
 
+type OnboardingOption = {
+  label: string;
+  value: string;
+};
+
 const CADENCE_OPTIONS: CadenceOption[] = [
   { id: "daily", label: "Tous les jours", cadence_unit: "day", cadence_target: 1 },
   { id: "three-per-week", label: "3 fois par semaine", cadence_unit: "week", cadence_target: 3 },
   { id: "once-per-week", label: "1 fois par semaine", cadence_unit: "week", cadence_target: 1 },
 ];
-const AGE_RANGE_OPTIONS = ["Moins de 25 ans", "25 à 34 ans", "35 à 44 ans", "45 à 54 ans", "55 ans et plus"] as const;
-const EXPERIENCE_LEVEL_OPTIONS = ["Débutant", "Intermédiaire", "Avancé"] as const;
-const DISCOVERY_SOURCE_OPTIONS = ["WhatsApp", "Instagram", "YouTube", "Recommandation", "Recherche web", "Autre"] as const;
+const AGE_RANGE_OPTIONS: OnboardingOption[] = [
+  { label: "Moins de 18 ans", value: "moins_de_18" },
+  { label: "18 à 24 ans", value: "18_24" },
+  { label: "25 à 34 ans", value: "25_34" },
+  { label: "35 à 44 ans", value: "35_44" },
+  { label: "45 à 54 ans", value: "45_54" },
+  { label: "55 ans et plus", value: "55_plus" },
+];
+const EXPERIENCE_LEVEL_OPTIONS: OnboardingOption[] = [
+  { label: "Débutant", value: "debutant" },
+  { label: "Intermédiaire", value: "intermediaire" },
+  { label: "Avancé", value: "avance" },
+];
+const DISCOVERY_SOURCE_OPTIONS: OnboardingOption[] = [
+  { label: "Instagram", value: "instagram" },
+  { label: "YouTube", value: "youtube" },
+  { label: "TikTok", value: "tiktok" },
+  { label: "Recommandation", value: "recommandation" },
+  { label: "Client", value: "client" },
+  { label: "Autre", value: "autre" },
+];
+const LEGACY_AGE_RANGE_VALUE_MAP: Record<string, string> = {
+  "Moins de 25 ans": "18_24",
+  "25 à 34 ans": "25_34",
+  "35 à 44 ans": "35_44",
+  "45 à 54 ans": "45_54",
+  "55 ans et plus": "55_plus",
+};
+const LEGACY_EXPERIENCE_LEVEL_VALUE_MAP: Record<string, string> = {
+  Débutant: "debutant",
+  Intermédiaire: "intermediaire",
+  Avancé: "avance",
+};
+const LEGACY_DISCOVERY_SOURCE_VALUE_MAP: Record<string, string> = {
+  Instagram: "instagram",
+  YouTube: "youtube",
+  TikTok: "tiktok",
+  Recommandation: "recommandation",
+  Client: "client",
+  Autre: "autre",
+  WhatsApp: "autre",
+  "Recherche web": "autre",
+};
 const EMPTY_ONBOARDING_FORM: OnboardingFormState = {
   firstName: "",
   lastName: "",
@@ -124,6 +171,41 @@ function isMissingProfileIdentityColumns(error: unknown) {
 
 function normalizeText(value: string | null | undefined) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeOptionValue(value: string | null | undefined, options: OnboardingOption[], legacyMap?: Record<string, string>) {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return "";
+  }
+
+  if (options.some((option) => option.value === normalized)) {
+    return normalized;
+  }
+
+  const legacyValue = legacyMap?.[normalized];
+  if (legacyValue && options.some((option) => option.value === legacyValue)) {
+    return legacyValue;
+  }
+
+  return "";
+}
+
+function normalizeSecondaryGoalsForTextarea(value: string[] | string | null | undefined) {
+  if (Array.isArray(value)) {
+    return value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).join(", ");
+  }
+
+  return normalizeText(value);
+}
+
+function parseSecondaryGoalsArray(value: string) {
+  const goals = value
+    .split(/[\n,]/)
+    .map((goal) => goal.trim())
+    .filter((goal) => goal.length > 0);
+
+  return goals.length > 0 ? goals : null;
 }
 
 function getLocalDateKey() {
@@ -248,7 +330,7 @@ export default function App() {
   async function fetchUserOnboardingRow(currentUserId: string) {
     const result = await supabase
       .from("user_onboarding")
-      .select("age_range,profession,use_reason,primary_goal,secondary_goals,experience_level,discovery_source,completed_at")
+      .select("age_range,profession,use_reason,use_reason_text,primary_goal,primary_goal_text,secondary_goals,experience_level,discovery_source,completed_at")
       .eq("user_id", currentUserId)
       .maybeSingle();
 
@@ -409,13 +491,21 @@ export default function App() {
         setOnboardingForm({
           firstName: normalizeText(profileIdentity?.first_name),
           lastName: normalizeText(profileIdentity?.last_name),
-          ageRange: normalizeText(userOnboarding?.age_range),
+          ageRange: normalizeOptionValue(userOnboarding?.age_range, AGE_RANGE_OPTIONS, LEGACY_AGE_RANGE_VALUE_MAP),
           profession: normalizeText(userOnboarding?.profession),
-          useReason: normalizeText(userOnboarding?.use_reason),
-          primaryGoal: normalizeText(userOnboarding?.primary_goal),
-          secondaryGoals: normalizeText(userOnboarding?.secondary_goals),
-          experienceLevel: normalizeText(userOnboarding?.experience_level),
-          discoverySource: normalizeText(userOnboarding?.discovery_source),
+          useReason: normalizeText(userOnboarding?.use_reason_text),
+          primaryGoal: normalizeText(userOnboarding?.primary_goal_text),
+          secondaryGoals: normalizeSecondaryGoalsForTextarea(userOnboarding?.secondary_goals),
+          experienceLevel: normalizeOptionValue(
+            userOnboarding?.experience_level,
+            EXPERIENCE_LEVEL_OPTIONS,
+            LEGACY_EXPERIENCE_LEVEL_VALUE_MAP
+          ),
+          discoverySource: normalizeOptionValue(
+            userOnboarding?.discovery_source,
+            DISCOVERY_SOURCE_OPTIONS,
+            LEGACY_DISCOVERY_SOURCE_VALUE_MAP
+          ),
         });
         setShowOnboardingModal(engagement.onboarding_done !== true);
       } catch (error) {
@@ -490,18 +580,21 @@ export default function App() {
       }
 
       const nowIso = new Date().toISOString();
+      const secondaryGoals = parseSecondaryGoalsArray(onboardingForm.secondaryGoals);
       const { error: onboardingUpsertError } = await supabase
         .from("user_onboarding")
         .upsert(
           {
             user_id: userId,
-            age_range: onboardingForm.ageRange.trim() || null,
+            age_range: onboardingForm.ageRange || null,
             profession: onboardingForm.profession.trim() || null,
-            use_reason: onboardingForm.useReason.trim() || null,
-            primary_goal: onboardingForm.primaryGoal.trim() || null,
-            secondary_goals: onboardingForm.secondaryGoals.trim() || null,
-            experience_level: onboardingForm.experienceLevel.trim() || null,
-            discovery_source: onboardingForm.discoverySource.trim() || null,
+            use_reason: "autre",
+            use_reason_text: onboardingForm.useReason.trim() || null,
+            primary_goal: "autre",
+            primary_goal_text: onboardingForm.primaryGoal.trim() || null,
+            secondary_goals: secondaryGoals,
+            experience_level: onboardingForm.experienceLevel || null,
+            discovery_source: onboardingForm.discoverySource || null,
             completed_at: nowIso,
           },
           { onConflict: "user_id" }
@@ -650,8 +743,8 @@ export default function App() {
                     >
                       <option value="">Sélectionner</option>
                       {AGE_RANGE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
@@ -680,7 +773,7 @@ export default function App() {
                       className="tf-adminInput"
                       value={onboardingForm.useReason}
                       onChange={(event) => setOnboardingForm((current) => ({ ...current, useReason: event.target.value }))}
-                      placeholder="Ex: Mieux gérer mes finances et investir régulièrement"
+                      placeholder="Ex: Mieux gérer mon argent et investir progressivement"
                     />
                   </div>
                   <div className="tf-adminModalField">
@@ -691,7 +784,7 @@ export default function App() {
                       className="tf-adminInput"
                       value={onboardingForm.primaryGoal}
                       onChange={(event) => setOnboardingForm((current) => ({ ...current, primaryGoal: event.target.value }))}
-                      placeholder="Ex: Construire une stratégie patrimoniale claire"
+                      placeholder="Ex: Construire un plan d'investissement clair"
                     />
                   </div>
                 </div>
@@ -709,8 +802,8 @@ export default function App() {
                     >
                       <option value="">Sélectionner</option>
                       {EXPERIENCE_LEVEL_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
@@ -725,8 +818,8 @@ export default function App() {
                     >
                       <option value="">Sélectionner</option>
                       {DISCOVERY_SOURCE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
