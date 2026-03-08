@@ -49,8 +49,8 @@ type OnboardingFormState = {
   lastName: string;
   ageRange: string;
   profession: string;
-  useReason: string;
-  primaryGoal: string;
+  useReasonText: string;
+  primaryGoalText: string;
   secondaryGoals: string;
   experienceLevel: string;
   discoverySource: string;
@@ -114,8 +114,8 @@ const EMPTY_ONBOARDING_FORM: OnboardingFormState = {
   lastName: "",
   ageRange: "",
   profession: "",
-  useReason: "",
-  primaryGoal: "",
+  useReasonText: "",
+  primaryGoalText: "",
   secondaryGoals: "",
   experienceLevel: "",
   discoverySource: "",
@@ -433,8 +433,8 @@ export default function App() {
       try {
         await ensureDefaultsForUser(userId);
         await trackDailyLogin(userId);
-      } catch {
-        // optionnel: console.error(e)
+      } catch (error) {
+        console.error("[bootstrap] ensureDefaultsForUser a échoué:", error);
       } finally {
         if (isMounted) {
           setBootstrapReady(true);
@@ -493,8 +493,8 @@ export default function App() {
           lastName: normalizeText(profileIdentity?.last_name),
           ageRange: normalizeOptionValue(userOnboarding?.age_range, AGE_RANGE_OPTIONS, LEGACY_AGE_RANGE_VALUE_MAP),
           profession: normalizeText(userOnboarding?.profession),
-          useReason: normalizeText(userOnboarding?.use_reason_text),
-          primaryGoal: normalizeText(userOnboarding?.primary_goal_text),
+          useReasonText: normalizeText(userOnboarding?.use_reason_text),
+          primaryGoalText: normalizeText(userOnboarding?.primary_goal_text),
           secondaryGoals: normalizeSecondaryGoalsForTextarea(userOnboarding?.secondary_goals),
           experienceLevel: normalizeOptionValue(
             userOnboarding?.experience_level,
@@ -567,16 +567,22 @@ export default function App() {
     };
 
     try {
-      const { error: profileUpdateError } = await supabase
-        .from("profiles")
-        .update({
-          first_name: firstName,
-          last_name: lastName,
-        })
-        .eq("id", userId);
+      const useReasonText = onboardingForm.useReasonText.trim();
+      const primaryGoalText = onboardingForm.primaryGoalText.trim();
 
-      if (profileUpdateError) {
-        throw profileUpdateError;
+      const { error: profileUpsertError } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: userId,
+            first_name: firstName,
+            last_name: lastName,
+          },
+          { onConflict: "id" }
+        );
+
+      if (profileUpsertError) {
+        throw profileUpsertError;
       }
 
       const nowIso = new Date().toISOString();
@@ -589,9 +595,9 @@ export default function App() {
             age_range: onboardingForm.ageRange || null,
             profession: onboardingForm.profession.trim() || null,
             use_reason: "autre",
-            use_reason_text: onboardingForm.useReason.trim() || null,
+            use_reason_text: useReasonText || null,
             primary_goal: "autre",
-            primary_goal_text: onboardingForm.primaryGoal.trim() || null,
+            primary_goal_text: primaryGoalText || null,
             secondary_goals: secondaryGoals,
             experience_level: onboardingForm.experienceLevel || null,
             discovery_source: onboardingForm.discoverySource || null,
@@ -641,6 +647,16 @@ export default function App() {
       );
       setShowOnboardingModal(false);
     } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "message" in error &&
+        typeof (error as { message?: unknown }).message === "string" &&
+        (error as { message: string }).message.toLowerCase().includes("profiles")
+      ) {
+        console.error("[onboarding] erreur sauvegarde profiles:", error);
+      }
+
       if (isMissingUserEngagementTable(error)) {
         setOnboardingDisabled(true);
         setShowOnboardingModal(false);
@@ -771,8 +787,8 @@ export default function App() {
                       id="onboarding-use-reason"
                       type="text"
                       className="tf-adminInput"
-                      value={onboardingForm.useReason}
-                      onChange={(event) => setOnboardingForm((current) => ({ ...current, useReason: event.target.value }))}
+                      value={onboardingForm.useReasonText}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, useReasonText: event.target.value }))}
                       placeholder="Ex: Mieux gérer mon argent et investir progressivement"
                     />
                   </div>
@@ -782,8 +798,8 @@ export default function App() {
                       id="onboarding-primary-goal"
                       type="text"
                       className="tf-adminInput"
-                      value={onboardingForm.primaryGoal}
-                      onChange={(event) => setOnboardingForm((current) => ({ ...current, primaryGoal: event.target.value }))}
+                      value={onboardingForm.primaryGoalText}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, primaryGoalText: event.target.value }))}
                       placeholder="Ex: Construire un plan d'investissement clair"
                     />
                   </div>
