@@ -2700,7 +2700,13 @@ export default function StatsPage() {
       {!loading && (
         <section className="tf-dashboard">
           <aside className="tf-sidebar tf-card tf-card--flat">
-            <div className="tf-sideLogo">TF</div>
+            <div className="tf-sideLogo" aria-label="TrustFinance">
+              <img
+                src="/trustfinance-logo.png"
+                alt="TrustFinance"
+                style={{ width: "76%", height: "76%", objectFit: "contain", display: "block" }}
+              />
+            </div>
             <nav className="tf-sideNav" aria-label="Navigation principale">
               <NavItem
                 label="Académie"
