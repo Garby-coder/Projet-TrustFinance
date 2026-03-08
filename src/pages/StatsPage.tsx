@@ -130,6 +130,10 @@ const COACH_THEME_ORDER = [
   "Structurer son investissement intelligemment.",
   "Comprendre les marchés financiers et le système bancaire.",
 ] as const;
+const COACH_THEME_DISPLAY_LABELS: Record<string, string> = {
+  "Présentation de l’accompagnement & Bilan initial.": "Bilan initial & Thèse d'investissement.",
+  "Optimisation et structuration bancaire.": "Optimisation & Structuration.",
+};
 
 const EMPTY_PROFILE_ENGAGEMENT: ProfileEngagement = {
   xp: 0,
@@ -176,6 +180,15 @@ function getSessionUiState(session: Pick<SessionItem, "status" | "scheduled_at">
 
   const sessionTimestamp = new Date(session.scheduled_at).getTime();
   return sessionTimestamp < Date.now() ? "awaiting_validation" : "scheduled";
+}
+
+function getCoachThemeDisplayName(theme: string | null | undefined) {
+  const normalizedTheme = (theme ?? "").trim();
+  if (!normalizedTheme) {
+    return null;
+  }
+
+  return COACH_THEME_DISPLAY_LABELS[normalizedTheme] ?? normalizedTheme;
 }
 
 function isDoneTask(task: TaskItem) {
@@ -2239,7 +2252,7 @@ export default function StatsPage() {
           <div className="modal-video">
             <iframe
               src={recordingUrl}
-              title={`Enregistrement ${selectedCoachSession.theme ?? "séance libre"}`}
+              title={`Enregistrement ${getCoachThemeDisplayName(selectedCoachSession.theme) ?? "séance libre"}`}
               allow="autoplay; fullscreen; picture-in-picture"
               allowFullScreen
             />
@@ -3069,11 +3082,11 @@ export default function StatsPage() {
                               type="button"
                               className={`card-button tf-card tf-moduleCardFixed tf-sessionCard${isSelectedSession ? " tf-moduleCard--active tf-sessionCard--active" : ""}`}
                               onClick={() => setSelectedSessionId(session.id)}
-                              aria-label={`Sélectionner la séance ${session.theme ?? "sans sujet"}`}
+                              aria-label={`Sélectionner la séance ${getCoachThemeDisplayName(session.theme) ?? "sans sujet"}`}
                             >
                               <div className="tf-moduleTop">
                                 <div className="tf-moduleTitleBlock">
-                                  <h4 className="tf-moduleTitle tf-clamp2">{session.theme ?? "Séance libre (sujet au choix)"}</h4>
+                                  <h4 className="tf-moduleTitle tf-clamp2">{getCoachThemeDisplayName(session.theme) ?? "Séance libre (sujet au choix)"}</h4>
                                   <span className={`tf-moduleBadge tf-moduleBadge--small ${sessionBadgeClass}`}>{sessionBadgeLabel}</span>
                                 </div>
                                 <span
@@ -3141,7 +3154,7 @@ export default function StatsPage() {
                     {viewMode === "coaching" && selectedCoachSession && (
                       <div className="tf-contentHeader">
                         <div className="tf-titleRow">
-                          <h2 className="tf-contentTitle tf-title">{selectedCoachSession.theme ?? "Séance libre (sujet au choix)"}</h2>
+                          <h2 className="tf-contentTitle tf-title">{getCoachThemeDisplayName(selectedCoachSession.theme) ?? "Séance libre (sujet au choix)"}</h2>
                           <div className="tf-titleActions">
                             {coachingHeaderStatus && <span className={coachingHeaderStatus.className}>{coachingHeaderStatus.label}</span>}
                             <button
@@ -3209,7 +3222,7 @@ export default function StatsPage() {
               ) : (
                 <div>
                   <p className="card-meta tf-chip tf-chip--accent">Coaching</p>
-                  <h3 className="modal-title tf-title">{selectedCoachSession?.theme ?? "Séance libre (sujet au choix)"}</h3>
+                  <h3 className="modal-title tf-title">{getCoachThemeDisplayName(selectedCoachSession?.theme) ?? "Séance libre (sujet au choix)"}</h3>
                   {selectedCoachSession?.objective && <p className="tf-contentSubtitle">{selectedCoachSession.objective}</p>}
                 </div>
               )}
@@ -3414,7 +3427,7 @@ export default function StatsPage() {
                       <p className="card-meta">
                         {formattedDate ?? "Date non planifiée"} · {isCompleted ? "Passée" : "À venir"}
                       </p>
-                      <h4 className="card-title tf-title">{session.theme ?? "Séance sans thème"}</h4>
+                      <h4 className="card-title tf-title">{getCoachThemeDisplayName(session.theme) ?? "Séance sans thème"}</h4>
                       <p className="card-text">{session.objective ?? "Objectif non renseigné."}</p>
                       {canReplan && (
                         <a
@@ -3749,7 +3762,7 @@ export default function StatsPage() {
                           <p className="card-meta">
                             {hourLabel} · {isCompleted ? "Effectuée" : "Programmée"}
                           </p>
-                          <h4 className="card-title tf-title">{session.theme ?? "Séance libre"}</h4>
+                          <h4 className="card-title tf-title">{getCoachThemeDisplayName(session.theme) ?? "Séance libre"}</h4>
 
                           {canReplan && (
                             <button

@@ -22,9 +22,22 @@ const PRIORITY_OPTIONS: Array<{ value: TaskPriority; label: string; className: s
   { value: "medium", label: "Moyenne", className: "tf-adminPriorityPill--medium" },
   { value: "high", label: "Haute", className: "tf-adminPriorityPill--high" },
 ];
+const COACH_THEME_DISPLAY_LABELS: Record<string, string> = {
+  "Présentation de l’accompagnement & Bilan initial.": "Bilan initial & Thèse d'investissement.",
+  "Optimisation et structuration bancaire.": "Optimisation & Structuration.",
+};
+
+function getCoachThemeDisplayName(theme: string | null | undefined) {
+  const normalizedTheme = (theme ?? "").trim();
+  if (!normalizedTheme) {
+    return null;
+  }
+
+  return COACH_THEME_DISPLAY_LABELS[normalizedTheme] ?? normalizedTheme;
+}
 
 function formatSessionLabel(session: AdminSession) {
-  const sessionName = session.theme?.trim() || "Séance libre (sujet au choix)";
+  const sessionName = getCoachThemeDisplayName(session.theme) || "Séance libre (sujet au choix)";
   if (!session.scheduled_at) {
     return `${sessionName} — À programmer`;
   }
