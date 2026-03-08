@@ -603,6 +603,7 @@ export default function StatsPage() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(false);
   const [showPilotageSoon, setShowPilotageSoon] = useState(false);
+  const [showBetaInfo, setShowBetaInfo] = useState(false);
   const [profileEngagement, setProfileEngagement] = useState<ProfileEngagement>(EMPTY_PROFILE_ENGAGEMENT);
   const [isAdmin, setIsAdmin] = useState(false);
   const [restoredActiveModuleId, setRestoredActiveModuleId] = useState<string | null>(null);
@@ -2713,6 +2714,16 @@ export default function StatsPage() {
               <NavItem label="Pilotage" icon={chartIcon} active={isPilotageActive} onClick={() => setShowPilotageSoon(true)} />
               {isAdmin && <NavItem label="Administrateur" icon={shieldIcon} active={isAdminActive} onClick={() => navigate("/admin")} />}
             </nav>
+            <div style={{ marginTop: "auto", paddingBottom: 12 }}>
+              <button
+                type="button"
+                className="tf-chip"
+                onClick={() => setShowBetaInfo(true)}
+                aria-label="Informations version bêta"
+              >
+                Bêta
+              </button>
+            </div>
           </aside>
 
           <main className="tf-dashboardMain">
@@ -3199,6 +3210,31 @@ export default function StatsPage() {
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button type="button" className="btn" onClick={() => setShowPilotageSoon(false)}>
                 OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBetaInfo && (
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setShowBetaInfo(false)}>
+          <div
+            className="modal-panel tf-modalPanel tf-card"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(560px, 100%)", maxHeight: "80vh" }}
+          >
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title tf-title">Version bêta</h3>
+              </div>
+            </div>
+            <p className="tf-subtitle" style={{ marginTop: 0 }}>
+              Cette plateforme est actuellement en version de test. Nous ajoutons progressivement des fonctionnalités et des modules.
+              En attendant, n’hésitez pas à nous faire vos retours sur WhatsApp.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" className="btn" onClick={() => setShowBetaInfo(false)}>
+                Fermer
               </button>
             </div>
           </div>
