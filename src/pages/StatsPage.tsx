@@ -64,6 +64,12 @@ type ProfileEngagement = {
   period_progress: number;
 };
 
+type ProfileRow = {
+  is_admin?: boolean;
+  first_name?: string | null;
+  last_name?: string | null;
+};
+
 type TaskItem = {
   id: string;
   title: string;
@@ -457,6 +463,11 @@ function isMissingUserEngagementTable(error: { code?: string; message: string })
   return error.code === "42P01" || (message.includes("does not exist") && message.includes("user_engagement"));
 }
 
+function isMissingProfileIdentityColumns(error: { code?: string; message: string }) {
+  const message = error.message.toLowerCase();
+  return error.code === "42703" && (message.includes("first_name") || message.includes("last_name"));
+}
+
 function isOrderIndexMissingColumnError(errorMessage: string) {
   const normalizedMessage = errorMessage.toLowerCase();
   return normalizedMessage.includes("order_index") && (normalizedMessage.includes("column") || normalizedMessage.includes("does not exist"));
@@ -544,6 +555,8 @@ export default function StatsPage() {
   const [error, setError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<CalendlyUser | null>(null);
+  const [profileFirstName, setProfileFirstName] = useState("");
+  const [profileLastName, setProfileLastName] = useState("");
 
   const [modules, setModules] = useState<ModuleItem[]>([]);
   const [moduleLessons, setModuleLessons] = useState<ModuleLesson[]>([]);
@@ -824,6 +837,28 @@ export default function StatsPage() {
   }, []);
 
   useEffect(() => {
+    function handleProfileUpdate(event: Event) {
+      const detail = (event as CustomEvent<{ first_name?: string; last_name?: string }>).detail;
+      if (!detail || typeof detail !== "object") {
+        return;
+      }
+
+      if (typeof detail.first_name === "string") {
+        setProfileFirstName(detail.first_name.trim());
+      }
+
+      if (typeof detail.last_name === "string") {
+        setProfileLastName(detail.last_name.trim());
+      }
+    }
+
+    window.addEventListener("tf:profile-updated", handleProfileUpdate as EventListener);
+    return () => {
+      window.removeEventListener("tf:profile-updated", handleProfileUpdate as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
 
     (async () => {
@@ -860,21 +895,41 @@ export default function StatsPage() {
       if (!currentUserId) {
         setError("Impossible d'identifier l'utilisateur.");
         setIsAdmin(false);
+        setProfileFirstName("");
+        setProfileLastName("");
         setLoading(false);
         return;
       }
 
-      const { data: profileData, error: profileError } = await supabase
+      let profileData: ProfileRow | null = null;
+      let profileError: { code?: string; message: string } | null = null;
+
+      const profileWithIdentityResult = await supabase
         .from("profiles")
-        .select("is_admin")
+        .select("is_admin,first_name,last_name")
         .eq("id", currentUserId)
         .maybeSingle();
+
+      profileData = (profileWithIdentityResult.data as ProfileRow | null) ?? null;
+      profileError = profileWithIdentityResult.error;
+
+      if (profileError && isMissingProfileIdentityColumns(profileError)) {
+        const fallbackProfileResult = await supabase
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", currentUserId)
+          .maybeSingle();
+        profileData = (fallbackProfileResult.data as ProfileRow | null) ?? null;
+        profileError = fallbackProfileResult.error;
+      }
 
       if (!isMounted) {
         return;
       }
 
       setIsAdmin(!profileError && profileData?.is_admin === true);
+      setProfileFirstName(typeof profileData?.first_name === "string" ? profileData.first_name.trim() : "");
+      setProfileLastName(typeof profileData?.last_name === "string" ? profileData.last_name.trim() : "");
 
       const { data: userEngagementRow, error: userEngagementError } = await supabase
         .from("user_engagement")
@@ -1430,10 +1485,17 @@ export default function StatsPage() {
   const trainingProgressPercent = totalLessonsCount > 0 ? Math.round((completedLessonsCount / totalLessonsCount) * 100) : 0;
 
   const profileMetadata = currentUser?.user_metadata ?? {};
+  const profileIdentityName = [profileFirstName, profileLastName]
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+    .join(" ")
+    .trim();
   const profileName =
+    profileIdentityName ||
     (typeof profileMetadata.full_name === "string" ? profileMetadata.full_name.trim() : "") ||
     (typeof profileMetadata.name === "string" ? profileMetadata.name.trim() : "") ||
     (currentUser?.email ? currentUser.email.split("@")[0] : "Utilisateur");
+  const sidebarProfileLabel = profileIdentityName || "Profil élève";
   const profileAvatarUrl =
     typeof profileMetadata.avatar_url === "string" && profileMetadata.avatar_url.trim().length > 0
       ? profileMetadata.avatar_url.trim()
@@ -2621,6 +2683,17 @@ export default function StatsPage() {
   const isAccompagnementActive = location.pathname === "/" || location.pathname === "/stats";
   const isPilotageActive = location.pathname === "/pilotage";
   const isAdminActive = location.pathname === "/admin";
+
+  async function handleProfileSignOut() {
+    try {
+      await supabase.auth.signOut();
+      setShowProfileModal(false);
+      navigate("/login");
+    } catch (error) {
+      console.warn("Impossible de se déconnecter depuis le profil.", error);
+    }
+  }
+
   const academyIcon = (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="m3.5 9.5 8.5-4 8.5 4-8.5 4-8.5-4Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
@@ -2707,6 +2780,9 @@ export default function StatsPage() {
                 style={{ width: "76%", height: "76%", objectFit: "contain", display: "block" }}
               />
             </div>
+            <p className="tf-muted" style={{ margin: "8px 0 0", fontSize: 11, lineHeight: 1.2, textAlign: "center" }}>
+              {sidebarProfileLabel}
+            </p>
             <nav className="tf-sideNav" aria-label="Navigation principale">
               <NavItem
                 label="Académie"
@@ -3294,9 +3370,14 @@ export default function StatsPage() {
                   Suis ta progression, tes streaks et tes badges débloqués.
                 </p>
               </div>
-              <button type="button" className="btn" aria-label="Fermer le profil" onClick={() => setShowProfileModal(false)}>
-                ×
-              </button>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button type="button" className="btn" onClick={() => void handleProfileSignOut()}>
+                  Se déconnecter
+                </button>
+                <button type="button" className="btn" aria-label="Fermer le profil" onClick={() => setShowProfileModal(false)}>
+                  ×
+                </button>
+              </div>
             </div>
 
             <div className="tf-scroll" style={{ maxHeight: "72vh" }}>

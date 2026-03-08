@@ -382,6 +382,20 @@
   margin: 0 0 14px;
 }
 
+.tf-app .login-card {
+  color: #111827;
+}
+
+.tf-app .login-card h2,
+.tf-app .login-card label {
+  color: #111827;
+}
+
+.tf-app .login-card .card-meta,
+.tf-app .login-card .message {
+  color: #6b7280;
+}
+
 .input-field {
   width: 100%;
   margin-top: 6px;
@@ -389,6 +403,16 @@
   border: 1px solid #d1d5db;
   border-radius: 10px;
   padding: 10px 12px;
+}
+
+.tf-app .login-card .input-field {
+  background: #ffffff;
+  color: #111827;
+  border-color: #cbd5e1;
+}
+
+.tf-app .login-card .input-field::placeholder {
+  color: #9ca3af;
 }
 
 .button-row {

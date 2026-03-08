@@ -26,11 +26,67 @@ type CadenceOption = {
   cadence_target: number;
 };
 
+type UserProfileIdentity = {
+  first_name: string | null;
+  last_name: string | null;
+};
+
+type UserOnboarding = {
+  age_range: string | null;
+  profession: string | null;
+  use_reason: string | null;
+  primary_goal: string | null;
+  secondary_goals: string | null;
+  experience_level: string | null;
+  discovery_source: string | null;
+  completed_at: string | null;
+};
+
+type OnboardingFormState = {
+  firstName: string;
+  lastName: string;
+  ageRange: string;
+  profession: string;
+  useReason: string;
+  primaryGoal: string;
+  secondaryGoals: string;
+  experienceLevel: string;
+  discoverySource: string;
+};
+
 const CADENCE_OPTIONS: CadenceOption[] = [
   { id: "daily", label: "Tous les jours", cadence_unit: "day", cadence_target: 1 },
   { id: "three-per-week", label: "3 fois par semaine", cadence_unit: "week", cadence_target: 3 },
   { id: "once-per-week", label: "1 fois par semaine", cadence_unit: "week", cadence_target: 1 },
 ];
+const AGE_RANGE_OPTIONS = ["Moins de 25 ans", "25 à 34 ans", "35 à 44 ans", "45 à 54 ans", "55 ans et plus"] as const;
+const USE_REASON_OPTIONS = [
+  "Mieux gérer mes finances",
+  "Commencer à investir",
+  "Structurer mon patrimoine",
+  "Préparer ma retraite",
+  "Améliorer ma discipline financière",
+] as const;
+const PRIMARY_GOAL_OPTIONS = [
+  "Constituer une épargne solide",
+  "Générer des revenus passifs",
+  "Investir en autonomie",
+  "Optimiser ma stratégie patrimoniale",
+  "Sécuriser mon avenir financier",
+] as const;
+const EXPERIENCE_LEVEL_OPTIONS = ["Débutant", "Intermédiaire", "Avancé"] as const;
+const DISCOVERY_SOURCE_OPTIONS = ["WhatsApp", "Instagram", "YouTube", "Recommandation", "Recherche web", "Autre"] as const;
+const EMPTY_ONBOARDING_FORM: OnboardingFormState = {
+  firstName: "",
+  lastName: "",
+  ageRange: "",
+  profession: "",
+  useReason: "",
+  primaryGoal: "",
+  secondaryGoals: "",
+  experienceLevel: "",
+  discoverySource: "",
+};
 const LAST_PATH_STORAGE_KEY = "tf:lastPath";
 const RESTORABLE_LAST_PATHS = new Set(["/stats", "/formation", "/seances", "/admin"]);
 
@@ -58,6 +114,30 @@ function isMissingUserEngagementTable(error: unknown) {
   const err = error as { code?: string; message?: string };
   const message = err.message?.toLowerCase() ?? "";
   return err.code === "42P01" || message.includes("relation") && message.includes("user_engagement") && message.includes("does not exist");
+}
+
+function isMissingUserOnboardingTable(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const err = error as { code?: string; message?: string };
+  const message = err.message?.toLowerCase() ?? "";
+  return err.code === "42P01" || message.includes("relation") && message.includes("user_onboarding") && message.includes("does not exist");
+}
+
+function isMissingProfileIdentityColumns(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const err = error as { code?: string; message?: string };
+  const message = err.message?.toLowerCase() ?? "";
+  return err.code === "42703" && (message.includes("first_name") || message.includes("last_name"));
+}
+
+function normalizeText(value: string | null | undefined) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function getLocalDateKey() {
@@ -139,6 +219,7 @@ export default function App() {
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [selectedCadenceId, setSelectedCadenceId] = useState<CadenceOption["id"]>("once-per-week");
+  const [onboardingForm, setOnboardingForm] = useState<OnboardingFormState>(EMPTY_ONBOARDING_FORM);
   const [onboardingLoading, setOnboardingLoading] = useState(false);
   const [onboardingError, setOnboardingError] = useState("");
   const [savingOnboarding, setSavingOnboarding] = useState(false);
@@ -159,6 +240,40 @@ export default function App() {
     }
 
     return result.data as UserEngagement | null;
+  }
+
+  async function fetchUserProfileIdentity(currentUserId: string) {
+    const result = await supabase
+      .from("profiles")
+      .select("first_name,last_name")
+      .eq("id", currentUserId)
+      .maybeSingle();
+
+    if (result.error) {
+      if (isMissingProfileIdentityColumns(result.error)) {
+        return null;
+      }
+      throw result.error;
+    }
+
+    return result.data as UserProfileIdentity | null;
+  }
+
+  async function fetchUserOnboardingRow(currentUserId: string) {
+    const result = await supabase
+      .from("user_onboarding")
+      .select("age_range,profession,use_reason,primary_goal,secondary_goals,experience_level,discovery_source,completed_at")
+      .eq("user_id", currentUserId)
+      .maybeSingle();
+
+    if (result.error) {
+      if (isMissingUserOnboardingTable(result.error)) {
+        return null;
+      }
+      throw result.error;
+    }
+
+    return result.data as UserOnboarding | null;
   }
 
   async function trackDailyLogin(currentUserId: string) {
@@ -211,6 +326,7 @@ export default function App() {
           setUserId(null);
           setBootstrapReady(false);
           setShowOnboardingModal(false);
+          setOnboardingForm(EMPTY_ONBOARDING_FORM);
           setOnboardingError("");
           setOnboardingDisabled(false);
         }
@@ -288,6 +404,11 @@ export default function App() {
           engagement = await fetchUserEngagementRow(userId);
         }
 
+        const [profileIdentity, userOnboarding] = await Promise.all([
+          fetchUserProfileIdentity(userId),
+          fetchUserOnboardingRow(userId),
+        ]);
+
         if (!isMounted) {
           return;
         }
@@ -299,6 +420,17 @@ export default function App() {
         }
 
         setSelectedCadenceId(getCadenceSelection(engagement));
+        setOnboardingForm({
+          firstName: normalizeText(profileIdentity?.first_name),
+          lastName: normalizeText(profileIdentity?.last_name),
+          ageRange: normalizeText(userOnboarding?.age_range),
+          profession: normalizeText(userOnboarding?.profession),
+          useReason: normalizeText(userOnboarding?.use_reason),
+          primaryGoal: normalizeText(userOnboarding?.primary_goal),
+          secondaryGoals: normalizeText(userOnboarding?.secondary_goals),
+          experienceLevel: normalizeText(userOnboarding?.experience_level),
+          discoverySource: normalizeText(userOnboarding?.discovery_source),
+        });
         setShowOnboardingModal(engagement.onboarding_done !== true);
       } catch (error) {
         if (!isMounted) {
@@ -332,6 +464,19 @@ export default function App() {
       return;
     }
 
+    const firstName = onboardingForm.firstName.trim();
+    const lastName = onboardingForm.lastName.trim();
+
+    if (!firstName) {
+      setOnboardingError("Le prénom est obligatoire.");
+      return;
+    }
+
+    if (!lastName) {
+      setOnboardingError("Le nom est obligatoire.");
+      return;
+    }
+
     setSavingOnboarding(true);
     setOnboardingError("");
 
@@ -346,6 +491,40 @@ export default function App() {
     };
 
     try {
+      const { error: profileUpdateError } = await supabase
+        .from("profiles")
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+        })
+        .eq("id", userId);
+
+      if (profileUpdateError) {
+        throw profileUpdateError;
+      }
+
+      const nowIso = new Date().toISOString();
+      const { error: onboardingUpsertError } = await supabase
+        .from("user_onboarding")
+        .upsert(
+          {
+            user_id: userId,
+            age_range: onboardingForm.ageRange.trim() || null,
+            profession: onboardingForm.profession.trim() || null,
+            use_reason: onboardingForm.useReason.trim() || null,
+            primary_goal: onboardingForm.primaryGoal.trim() || null,
+            secondary_goals: onboardingForm.secondaryGoals.trim() || null,
+            experience_level: onboardingForm.experienceLevel.trim() || null,
+            discovery_source: onboardingForm.discoverySource.trim() || null,
+            completed_at: nowIso,
+          },
+          { onConflict: "user_id" }
+        );
+
+      if (onboardingUpsertError) {
+        throw onboardingUpsertError;
+      }
+
       const firstUpdate = await supabase
         .from("user_engagement")
         .update(updatePayload)
@@ -376,6 +555,11 @@ export default function App() {
         }
       }
 
+      window.dispatchEvent(
+        new CustomEvent("tf:profile-updated", {
+          detail: { first_name: firstName, last_name: lastName },
+        })
+      );
       setShowOnboardingModal(false);
     } catch (error) {
       if (isMissingUserEngagementTable(error)) {
@@ -385,7 +569,13 @@ export default function App() {
         return;
       }
 
-      setOnboardingError("Impossible d'enregistrer ton rythme. Réessaie.");
+      if (isMissingUserOnboardingTable(error)) {
+        setOnboardingError("Le formulaire onboarding n'est pas disponible pour le moment.");
+      } else if (isMissingProfileIdentityColumns(error)) {
+        setOnboardingError("Impossible d'enregistrer ton prénom et ton nom pour le moment.");
+      } else {
+        setOnboardingError("Impossible d'enregistrer ton onboarding. Réessaie.");
+      }
     } finally {
       setSavingOnboarding(false);
     }
@@ -420,7 +610,7 @@ export default function App() {
           <Route path="*" element={<Navigate to={isAuthed ? "/" : "/login"} replace />} />
         </Routes>
 
-        {isAuthed && onboardingLoading && !showOnboardingModal && <p className="muted">Chargement de ton rythme...</p>}
+        {isAuthed && onboardingLoading && !showOnboardingModal && <p className="muted">Chargement de ton onboarding...</p>}
         {isAuthed && onboardingError && !showOnboardingModal && <div className="error-box">{onboardingError}</div>}
 
         {isAuthed && showOnboardingModal && (
@@ -429,9 +619,145 @@ export default function App() {
               <div className="modal-header">
                 <div>
                   <h3 id="global-cadence-onboarding-title" className="modal-title">
-                    Configurer ton rythme (30 sec)
+                    Configurons ton profil (1 min)
                   </h3>
-                  <p className="card-text">Pour adapter tes streaks et objectifs.</p>
+                  <p className="card-text">Réponds à ces questions pour personnaliser ton expérience.</p>
+                </div>
+              </div>
+
+              <div className="modal-section">
+                <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                  <div className="tf-adminModalField">
+                    <label className="tf-subtitle" htmlFor="onboarding-first-name">Prénom</label>
+                    <input
+                      id="onboarding-first-name"
+                      type="text"
+                      className="tf-adminInput"
+                      value={onboardingForm.firstName}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, firstName: event.target.value }))}
+                      placeholder="Ex: Camille"
+                    />
+                  </div>
+                  <div className="tf-adminModalField">
+                    <label className="tf-subtitle" htmlFor="onboarding-last-name">Nom</label>
+                    <input
+                      id="onboarding-last-name"
+                      type="text"
+                      className="tf-adminInput"
+                      value={onboardingForm.lastName}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, lastName: event.target.value }))}
+                      placeholder="Ex: Dupont"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-section">
+                <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                  <div className="tf-adminModalField">
+                    <label className="tf-subtitle" htmlFor="onboarding-age-range">Tranche d’âge</label>
+                    <select
+                      id="onboarding-age-range"
+                      className="tf-adminInput"
+                      value={onboardingForm.ageRange}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, ageRange: event.target.value }))}
+                    >
+                      <option value="">Sélectionner</option>
+                      {AGE_RANGE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="tf-adminModalField">
+                    <label className="tf-subtitle" htmlFor="onboarding-profession">Profession</label>
+                    <input
+                      id="onboarding-profession"
+                      type="text"
+                      className="tf-adminInput"
+                      value={onboardingForm.profession}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, profession: event.target.value }))}
+                      placeholder="Ex: Consultant, Salarié, Entrepreneur..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-section">
+                <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                  <div className="tf-adminModalField">
+                    <label className="tf-subtitle" htmlFor="onboarding-use-reason">Pourquoi utilises-tu l’outil ?</label>
+                    <input
+                      id="onboarding-use-reason"
+                      type="text"
+                      className="tf-adminInput"
+                      value={onboardingForm.useReason}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, useReason: event.target.value }))}
+                      placeholder="Ex: Mieux gérer mes finances et investir régulièrement"
+                    />
+                  </div>
+                  <div className="tf-adminModalField">
+                    <label className="tf-subtitle" htmlFor="onboarding-primary-goal">Quel est ton objectif principal ?</label>
+                    <input
+                      id="onboarding-primary-goal"
+                      type="text"
+                      className="tf-adminInput"
+                      value={onboardingForm.primaryGoal}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, primaryGoal: event.target.value }))}
+                      placeholder="Ex: Construire une stratégie patrimoniale claire"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-section">
+                <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                  <div className="tf-adminModalField">
+                    <label className="tf-subtitle" htmlFor="onboarding-experience-level">Quel est ton niveau actuel ?</label>
+                    <select
+                      id="onboarding-experience-level"
+                      className="tf-adminInput"
+                      value={onboardingForm.experienceLevel}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, experienceLevel: event.target.value }))}
+                    >
+                      <option value="">Sélectionner</option>
+                      {EXPERIENCE_LEVEL_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="tf-adminModalField">
+                    <label className="tf-subtitle" htmlFor="onboarding-discovery-source">Comment nous as-tu connus ?</label>
+                    <select
+                      id="onboarding-discovery-source"
+                      className="tf-adminInput"
+                      value={onboardingForm.discoverySource}
+                      onChange={(event) => setOnboardingForm((current) => ({ ...current, discoverySource: event.target.value }))}
+                    >
+                      <option value="">Sélectionner</option>
+                      {DISCOVERY_SOURCE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-section">
+                <div className="tf-adminModalField">
+                  <label className="tf-subtitle" htmlFor="onboarding-secondary-goals">Quels sont tes objectifs secondaires ?</label>
+                  <textarea
+                    id="onboarding-secondary-goals"
+                    className="tf-adminTextarea"
+                    value={onboardingForm.secondaryGoals}
+                    onChange={(event) => setOnboardingForm((current) => ({ ...current, secondaryGoals: event.target.value }))}
+                    placeholder="Ex: mieux comprendre la bourse, optimiser mon budget, préparer un achat immobilier..."
+                  />
                 </div>
               </div>
 
@@ -447,9 +773,23 @@ export default function App() {
                         className="btn"
                         onClick={() => setSelectedCadenceId(option.id)}
                         aria-pressed={isSelected}
-                        style={isSelected ? { background: "#111827", color: "#ffffff", borderColor: "#111827" } : undefined}
+                        style={
+                          isSelected
+                            ? {
+                                background: "rgba(175, 135, 50, 0.24)",
+                                color: "#ffffff",
+                                borderColor: "rgba(175, 135, 50, 0.85)",
+                                boxShadow: "0 0 0 1px rgba(175, 135, 50, 0.35)",
+                                fontWeight: 700,
+                              }
+                            : {
+                                background: "rgba(255, 255, 255, 0.03)",
+                                color: "rgba(245, 245, 245, 0.9)",
+                                borderColor: "rgba(255, 255, 255, 0.18)",
+                              }
+                        }
                       >
-                        {option.label}
+                        {isSelected ? `✓ ${option.label}` : option.label}
                       </button>
                     );
                   })}
