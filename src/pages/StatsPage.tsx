@@ -22,6 +22,7 @@ type ModuleLesson = {
   content_type: string | null;
   tella_url: string | null;
   content_markdown: string | null;
+  notion_embed_url: string | null;
   is_published: boolean | null;
 };
 
@@ -615,6 +616,8 @@ export default function StatsPage() {
   const [taskTogglePendingId, setTaskTogglePendingId] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(false);
+  const [openNotionSupport, setOpenNotionSupport] = useState<{ url: string; lessonTitle: string } | null>(null);
+  const [notionSupportIframeFailed, setNotionSupportIframeFailed] = useState(false);
   const [showPilotageSoon, setShowPilotageSoon] = useState(false);
   const [showBetaInfo, setShowBetaInfo] = useState(false);
   const [profileEngagement, setProfileEngagement] = useState<ProfileEngagement>(EMPTY_PROFILE_ENGAGEMENT);
@@ -982,7 +985,7 @@ export default function StatsPage() {
 
         const { data: lessonsData, error: lessonsError } = await supabase
           .from("lessons")
-          .select("id,module_id,title,order_index,duration_min,content_type,tella_url,content_markdown,is_published")
+          .select("id,module_id,title,order_index,duration_min,content_type,tella_url,content_markdown,notion_embed_url,is_published")
           .eq("is_published", true)
           .order("order_index", { ascending: true });
 
@@ -2136,6 +2139,10 @@ export default function StatsPage() {
     if (activeTab === "lessons" && activeLesson) {
       const hasVideo = typeof activeLesson.tella_url === "string" && activeLesson.tella_url.trim().length > 0;
       const hasMarkdown = typeof activeLesson.content_markdown === "string" && activeLesson.content_markdown.trim().length > 0;
+      const notionEmbedUrl =
+        typeof activeLesson.notion_embed_url === "string" && activeLesson.notion_embed_url.trim().length > 0
+          ? activeLesson.notion_embed_url.trim()
+          : "";
 
       return (
         <div className="tf-paneStack">
@@ -2160,6 +2167,21 @@ export default function StatsPage() {
             <p className="card-text" style={{ whiteSpace: "pre-wrap" }}>
               {activeLesson.content_markdown}
             </p>
+          )}
+
+          {notionEmbedUrl && (
+            <div style={{ marginTop: 4 }}>
+              <button
+                type="button"
+                className="tf-btn tf-btn--accent"
+                onClick={() => {
+                  setNotionSupportIframeFailed(false);
+                  setOpenNotionSupport({ url: notionEmbedUrl, lessonTitle: activeLesson.title });
+                }}
+              >
+                Ouvrir le support de cours
+              </button>
+            </div>
           )}
 
           {!hasVideo && !hasMarkdown && <div className="empty-state">Contenu indisponible pour cette leçon.</div>}
@@ -3349,6 +3371,44 @@ export default function StatsPage() {
             <div className="tf-scroll" style={{ maxHeight: "calc(90vh - 180px)" }}>
               <div className="tf-paneStack">{viewMode === "accompagnement" ? renderActivePanelBody() : renderCoachingPanelBody()}</div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {openNotionSupport && (
+        <div className="modal-backdrop tf-modalBackdrop" onClick={() => setOpenNotionSupport(null)}>
+          <div
+            className="modal-panel tf-modalPanel tf-card"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(1280px, 98vw)", height: "92vh", display: "flex", flexDirection: "column" }}
+          >
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title tf-title">Support de cours</h3>
+                <p className="tf-subtitle" style={{ margin: "6px 0 0" }}>{openNotionSupport.lessonTitle}</p>
+              </div>
+              <button type="button" className="btn" onClick={() => setOpenNotionSupport(null)}>
+                Fermer
+              </button>
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0, borderRadius: 12, border: "1px solid var(--border2)", overflow: "hidden" }}>
+              <iframe
+                src={openNotionSupport.url}
+                title={`Support Notion - ${openNotionSupport.lessonTitle}`}
+                style={{ width: "100%", height: "100%", border: "none", background: "white" }}
+                onError={() => setNotionSupportIframeFailed(true)}
+              />
+            </div>
+
+            <p className="tf-muted" style={{ margin: "12px 0 0", fontSize: 13 }}>
+              {notionSupportIframeFailed
+                ? "Impossible d'afficher le support dans la fenêtre. "
+                : "Si le support ne s'affiche pas correctement, ouvre-le dans un nouvel onglet : "}
+              <a href={openNotionSupport.url} target="_blank" rel="noreferrer">
+                Ouvrir le support Notion
+              </a>
+            </p>
           </div>
         </div>
       )}
